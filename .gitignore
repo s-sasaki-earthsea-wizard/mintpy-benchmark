@@ -1,0 +1,12 @@
+# Bench / profile runs produce machine-dependent artifacts (wall time,
+# RSS, VRAM-derived auto chunk sizes, hostnames, /home paths) that have
+# no meaning on a different machine and previously leaked host info
+# into the public repo (audited 2026-05-02). The whole logs_*/ tree is
+# therefore untracked.
+#
+# What stays tracked under benchmark/: harness scripts (run_*.sh, *.py),
+# test fixtures (FernandinaSenDT128_torch.txt), reports (report_*.md),
+# and requirements.txt. Numerical findings are transcribed into the
+# corresponding report by hand; raw artifacts live only on the
+# developer's machine.
+logs_*/
