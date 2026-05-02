@@ -1,0 +1,6 @@
+# Benchmark / profiling tools (fork-only, not upstream).
+# torch.profiler ships with PyTorch (installed via [gpu] extras).
+#
+# Install (in addition to the main env):
+#   uv pip install -r benchmark/requirements.txt
+py-spy
