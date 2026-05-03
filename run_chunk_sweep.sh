@@ -21,6 +21,9 @@
 
 set -u
 
+# Cap host VA at 80% of physical RAM (see lib/setup_ulimit.sh for why)
+source "$(dirname "$0")/lib/setup_ulimit.sh"
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK_DIR="${WORK_DIR:?set WORK_DIR to the SSD copy of FernandinaSenDT128/mintpy}"
 TEMPLATE_BASE="${TEMPLATE:-${REPO_ROOT}/benchmark/FernandinaSenDT128_torch.txt}"
