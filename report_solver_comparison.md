@@ -2,11 +2,12 @@
 
 実施日: 2026-05-03 (JST)
 対象: torch backend (`mintpy.networkInversion.backend = torch`) の chunk-内 solver、
-[`mintpy.ifgram_inversion_gpu._SOLVER`](https://github.com/s-sasaki-earthsea-wizard/MintPy/blob/main/src/mintpy/ifgram_inversion_gpu.py#L50) 定数の二択比較
+[`mintpy.ifgram_inversion_gpu._SOLVER`](https://github.com/s-sasaki-earthsea-wizard/MintPy/blob/eedfaf17/src/mintpy/ifgram_inversion_gpu.py#L50) 定数の二択比較
+(`_SOLVER` 定数は本レポート公開後の cleanup PR で削除済み — permalink で参照)
 データセット: FernandinaSenDT128 (98 dates × 288 ifgrams、269,999 px に反転)
 
 > **本レポートのスコープ**: 両 solver を完走させ、wall time / 数値同等性 / kernel 構造を並べる。
-> **`cholesky` の採用判断・`lstsq` 経路の削除判断はスコープ外** ([Issue #4](https://github.com/s-sasaki-earthsea-wizard/MintPy/issues/4) 別タスク)。
+> **`cholesky` の採用判断・`lstsq` 経路の削除判断はスコープ外** ([Issue #4](https://github.com/s-sasaki-earthsea-wizard/MintPy/issues/4) 別タスク。本レポート完了後に同 issue で削除判断 → `_SOLVER` / `_solve_lstsq` および本 sibling repo の比較ハーネス 3 本 (`run_solver_comparison.sh` / `run_smallbaseline_with_solver.py` / `profile_torch_solver.py`) は cleanup PR で removed。本文中の参照はすべて comparison-era commit `0682c4c` の permalink)。
 
 ---
 
@@ -40,11 +41,11 @@
 | Solver 切替 | env var `MINTPY_SOLVER` から `_SOLVER` を runtime override (本 sibling repo の wrapper、MintPy 本体無変更) |
 | 反転対象 pixel | 269,999 / 270,000 (avgSpatialCoh threshold 0.7、cold-start) |
 
-ハーネス:
-- bench: [`run_solver_comparison.sh`](run_solver_comparison.sh) (3-shot/solver、pre-clean h5、`/usr/bin/time -v`)
-- wrapper: [`run_smallbaseline_with_solver.py`](run_smallbaseline_with_solver.py)
-- profile: [`profile_torch_solver.py`](profile_torch_solver.py) (solver-aware monkey-patch)
-- RMS: [`compare_solutions.py`](compare_solutions.py) (per-pixel std で正規化)
+ハーネス (lstsq 経路撤去後は本レポート用に historical reference として permalink で参照):
+- bench: [`run_solver_comparison.sh`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/run_solver_comparison.sh) (3-shot/solver、pre-clean h5、`/usr/bin/time -v`)
+- wrapper: [`run_smallbaseline_with_solver.py`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/run_smallbaseline_with_solver.py)
+- profile: [`profile_torch_solver.py`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/profile_torch_solver.py) (solver-aware monkey-patch)
+- RMS: [`compare_solutions.py`](compare_solutions.py) (per-pixel std で正規化、generic な h5 比較ツールとして残置)
 
 ---
 
@@ -102,7 +103,7 @@ raw artifacts: [compare/summary.txt](logs_solver_run1/compare/summary.txt) / [co
 
 ## 4. GPU kernel breakdown (1 chunk あたり)
 
-両 solver を `torch.profiler` で `schedule(wait=1, active=1)` の 1 chunk 分プロファイル。Per-chunk step boundary は dispatch 関数 (`_solve_cholesky` / `_solve_lstsq`) を monkey-patch し、`prof.step()` を 1 chunk 1 回挟む形 ([profile_torch_solver.py](profile_torch_solver.py))。
+両 solver を `torch.profiler` で `schedule(wait=1, active=1)` の 1 chunk 分プロファイル。Per-chunk step boundary は dispatch 関数 (`_solve_cholesky` / `_solve_lstsq`) を monkey-patch し、`prof.step()` を 1 chunk 1 回挟む形 ([profile_torch_solver.py @ 0682c4c](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/profile_torch_solver.py))。
 
 raw artifacts:
 - cholesky: [profile/cholesky/parsed.md](logs_solver_run1/profile/cholesky/parsed.md) / [key_averages.txt](logs_solver_run1/profile/cholesky/tb_trace/) / [trace.json](logs_solver_run1/profile/cholesky/tb_trace/) (139 KB)
@@ -214,7 +215,7 @@ cholesky の wall=61 s に対して internal=14 s。差 47 s = (Python interpret
 
 ### 6.4 update-mode skip 罠
 
-各 shot 開始前に `timeseries.h5 / temporalCoherence.h5 / numInvIfgram.h5` を `rm -f` ([`run_solver_comparison.sh`](run_solver_comparison.sh) の `run_one_shot`)。invert_network は MintPy の update-mode skip key list に入っており、leftover h5 が残ると silent に no-op される。
+各 shot 開始前に `timeseries.h5 / temporalCoherence.h5 / numInvIfgram.h5` を `rm -f` ([`run_solver_comparison.sh @ 0682c4c`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/run_solver_comparison.sh) の `run_one_shot`)。invert_network は MintPy の update-mode skip key list に入っており、leftover h5 が残ると silent に no-op される。
 
 ---
 
