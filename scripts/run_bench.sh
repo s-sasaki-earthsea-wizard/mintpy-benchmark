@@ -6,7 +6,7 @@ set -u
 # Cap host VA at 80% of physical RAM (see lib/setup_ulimit.sh for why)
 source "$(dirname "$0")/lib/setup_ulimit.sh"
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # WORK_DIR / TEMPLATE may be overridden via env var to run on a copy of the
 # tutorial dataset placed elsewhere (e.g. SSD vs NAS, to isolate I/O cost).
 WORK_DIR="${WORK_DIR:-${REPO_ROOT}/FernandinaSenDT128/mintpy}"

@@ -2,8 +2,8 @@
 
 実施日: 2026-04-26 (JST)
 対象: `smallbaselineApp.py FernandinaSenDT128.txt` の全 18 ステップ
-計測スクリプト: [benchmark/run_bench.sh](run_bench.sh)
-ログ一式: [benchmark/logs_baseline/](logs_baseline/)
+計測スクリプト: [benchmark/run_bench.sh](../scripts/run_bench.sh)
+ログ一式: [benchmark/logs_baseline/](../logs_baseline/)
 
 ---
 
@@ -21,7 +21,7 @@
 | Python | 3.12.3 (`.venv/`, uv 管理) |
 | 主要ライブラリ | numpy 2.4.4, scipy 1.17.1, h5py 3.16.0, dask 2026.3.0, torch 2.11.0+cu128 (未使用), cupy-cuda12x 14.0.1 (未使用) |
 
-詳細は [logs_baseline/machine_info.txt](logs_baseline/machine_info.txt) 参照。
+詳細は [logs_baseline/machine_info.txt](../logs_baseline/machine_info.txt) 参照。
 
 > **注意**: 入力データ約 1 GB は NAS (CIFS / 1GbE) 上にあり、I/O がボトルネックになるステップ (`load_data` など) はローカル NVMe より遅い可能性があります。
 
@@ -29,7 +29,7 @@
 
 ## 2. データセット規模
 
-[FernandinaSenDT128/mintpy/inputs/ifgramStack.h5](../FernandinaSenDT128/mintpy/inputs/) の主な寸法:
+[FernandinaSenDT128/mintpy/inputs/ifgramStack.h5](../../FernandinaSenDT128/mintpy/inputs/) の主な寸法:
 
 | 項目 | 値 |
 |---|---|
@@ -116,4 +116,4 @@
 1. `src/mintpy/ifgram_inversion.py` を読み、最小二乗反転のループ構造とデータ I/O パターンを把握
 2. CuPy / PyTorch でのバッチ反転プロトタイプを別モジュール (`mintpy/ifgram_inversion_gpu.py` など) に実装
 3. テンプレートに切替フラグ (例: `mintpy.networkInversion.backend = cpu|cupy|torch`) を追加
-4. 同じベンチマークスクリプト ([run_bench.sh](run_bench.sh)) を再実行し、`benchmark/logs_gpu/` に保存して比較レポート (`report_gpu.md`) を作成
+4. 同じベンチマークスクリプト ([run_bench.sh](../scripts/run_bench.sh)) を再実行し、`benchmark/logs_gpu/` に保存して比較レポート (`report_gpu.md`) を作成
