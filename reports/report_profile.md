@@ -21,7 +21,7 @@ which collapses the per-chunk launch count from ~1.88 M to ~5.
 
 ## Methodology
 
-- Harness: [`benchmark/run_profile_pyspy.sh`](run_profile_pyspy.sh)
+- Harness: [`benchmark/run_profile_pyspy.sh`](../scripts/run_profile_pyspy.sh)
 - Backend: `mintpy.networkInversion.backend = torch`,
   `mintpy.networkInversion.gpuChunkSize = 0` (auto-resolved to 19,388 px
   per chunk → 14 chunks)
@@ -61,7 +61,7 @@ Approx. time = `samples / total × wall`.
 | Driver init (torch import + CUDA preload) | ~1,000 | ~3.8% | ~10 s |
 
 `mask_stack_obs` is bypassed because the GPU-dispatch branch in
-[`ifgram_inversion.py`](../src/mintpy/ifgram_inversion.py#L809-L833)
+[`ifgram_inversion.py`](../../src/mintpy/ifgram_inversion.py#L809-L833)
 returns before the legacy per-pixel CPU loop that would call it.
 
 ## Findings
@@ -88,8 +88,8 @@ returns before the legacy per-pixel CPU loop that would call it.
 
 ### Methodology
 
-- Harness: [`run_profile_torch.sh`](run_profile_torch.sh) +
-  [`profile_torch.py`](profile_torch.py)
+- Harness: [`run_profile_torch.sh`](../scripts/run_profile_torch.sh) +
+  [`profile_torch.py`](../tools/profile_torch.py)
 - Profiler config: `schedule(wait=1, warmup=0, active=1, repeat=1)` —
   records exactly one chunk after CUDA lazy init has stabilised, with
   `tensorboard_trace_handler` flushing the active window to disk
@@ -100,7 +100,7 @@ returns before the legacy per-pixel CPU loop that would call it.
   `prof.step()` advances 1:1 with chunks (`estimate_timeseries_batch`
   calls it exactly once per chunk)
 - `ulimit -v`: 80% of physical RAM (75 GiB on this 93 GiB host) via
-  [`lib/setup_ulimit.sh`](lib/setup_ulimit.sh)
+  [`lib/setup_ulimit.sh`](../scripts/lib/setup_ulimit.sh)
 
 `prof.key_averages().table()` aggregation overflowed Python heap
 (`std::bad_alloc` at 50.7 GiB RSS) even with `active=1`: kineto
@@ -110,7 +110,7 @@ materialising them as Python objects exceeded the C++ allocator's
 reach. The harness catches the `MemoryError` and falls through; the
 on-disk Chrome trace JSON (3.87 GiB) remains the authoritative
 artifact and is reduced offline by
-[`parse_trace.py`](parse_trace.py).
+[`parse_trace.py`](../tools/parse_trace.py).
 
 ### Results — one chunk (19,403 pixels, 19.887 s wall)
 
@@ -224,7 +224,7 @@ the chunk wall directly. All non-`lstsq` aten ops total < 0.7 s.
   `with_stack=True`) hit the same wall at higher RSS (94.9 GiB,
   required a hard reboot). The current harness writes the on-disk
   Chrome trace via `tensorboard_trace_handler` and reduces it offline
-  with [`parse_trace.py`](parse_trace.py); `key_averages.txt` is best-
+  with [`parse_trace.py`](../tools/parse_trace.py); `key_averages.txt` is best-
   effort and routinely empty.
 - **Per-chunk profile only.** `schedule(active=1)` records exactly
   one chunk; cross-chunk variance is not measured. The chunk-size
@@ -238,15 +238,15 @@ the chunk wall directly. All non-`lstsq` aten ops total < 0.7 s.
 
 ## Files
 
-- py-spy harness: [`run_profile_pyspy.sh`](run_profile_pyspy.sh)
+- py-spy harness: [`run_profile_pyspy.sh`](../scripts/run_profile_pyspy.sh)
 - torch.profiler harness:
-  [`run_profile_torch.sh`](run_profile_torch.sh) +
-  [`profile_torch.py`](profile_torch.py)
-- Trace post-processor: [`parse_trace.py`](parse_trace.py)
-- Shared OOM safety net: [`lib/setup_ulimit.sh`](lib/setup_ulimit.sh)
-- Bench-only deps: [`requirements.txt`](requirements.txt)
+  [`run_profile_torch.sh`](../scripts/run_profile_torch.sh) +
+  [`profile_torch.py`](../tools/profile_torch.py)
+- Trace post-processor: [`parse_trace.py`](../tools/parse_trace.py)
+- Shared OOM safety net: [`lib/setup_ulimit.sh`](../scripts/lib/setup_ulimit.sh)
+- Bench-only deps: [`requirements.txt`](../requirements.txt)
 - Test fixture template:
-  [`FernandinaSenDT128_torch.txt`](FernandinaSenDT128_torch.txt)
+  [`FernandinaSenDT128_torch.txt`](../fixtures/FernandinaSenDT128_torch.txt)
 
 Raw artifacts (`pyspy.svg`, `*.pt.trace.json`, `run.log`, `run.time`,
 env snapshots) are not committed (see `.gitignore`).

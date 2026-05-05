@@ -3,14 +3,14 @@
 Date: 2026-04-26 (JST)
 Subject: Validate the sweet spot of `mintpy.networkInversion.gpuChunkSize`, and pre-separate the GPU-lstsq intrinsic time from surrounding overhead (a preparatory step for follow-up #1 of [Issue #2](https://github.com/s-sasaki-earthsea-wizard/MintPy/issues/2))
 
-Harness: [benchmark/run_chunk_sweep.sh](run_chunk_sweep.sh)
-Log set: [logs_chunk_sweep/](logs_chunk_sweep/)
+Harness: [benchmark/run_chunk_sweep.sh](../scripts/run_chunk_sweep.sh)
+Log set: [logs_chunk_sweep/](../logs_chunk_sweep/)
 
 ---
 
 ## 1. Goal
 
-In the SSD-Torch bench from [report_torch.md](report_torch.md), the internal time of `invert_network` plateaued at **257.4 s (1.43× speedup over CPU)**. The expected ceiling factors for that smaller-than-hoped speedup were the three hypotheses raised in the prior session ([2026-04-26 notes](../.claude-notes/2026-04-26_invert-network-torch.md) L101–105):
+In the SSD-Torch bench from [report_torch.md](report_torch.md), the internal time of `invert_network` plateaued at **257.4 s (1.43× speedup over CPU)**. The expected ceiling factors for that smaller-than-hoped speedup were the three hypotheses raised in the prior session ([2026-04-26 notes](../../.claude-notes/2026-04-26_invert-network-torch.md) L101–105):
 
 | Hypothesis | Expected behaviour |
 |---|---|
@@ -65,7 +65,7 @@ Each chunk_size was run in **2 round-robin rounds** (Round 1: 1k → 5k → 10k 
 | 30,000 | 9 | 277.49 | 276.05 | 250.75 | 248.60 | 0.929 | 2.61 |
 | 40,000 | 7 | 268.23 | 263.35 | 244.80 | 242.10 | 0.907 | 2.63 |
 
-per-pixel = internal mean / 269,999 pixels × 1000. Raw data: [logs_chunk_sweep/summary.tsv](logs_chunk_sweep/summary.tsv).
+per-pixel = internal mean / 269,999 pixels × 1000. Raw data: [logs_chunk_sweep/summary.tsv](../logs_chunk_sweep/summary.tsv).
 
 ### 3.2 Round-by-round raw data
 
