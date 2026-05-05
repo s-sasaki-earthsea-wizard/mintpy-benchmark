@@ -6,8 +6,8 @@ under a torch.profiler context and emits a Chrome trace + a kernel-level
 key_averages summary covering the first few chunks of
 ``estimate_timeseries_batch``.
 
-Companion to run_profile_pyspy.sh: where py-spy answers "which Python
-lines are hot", this script answers "which CUDA kernels inside
+Companion to scripts/run_profile_pyspy.sh: where py-spy answers "which
+Python lines are hot", this script answers "which CUDA kernels inside
 torch.linalg.lstsq dominate, and what is the H2D / compute / D2H
 balance".
 
@@ -18,7 +18,8 @@ OOM-safety (see 2026-05-02 incident: torch.profiler at 94.9 GiB RSS):
   * ``record_shapes`` / ``with_stack`` / ``profile_memory`` default to
     False; ``with_stack`` in particular is the dominant host-RSS cost
     and was the trigger of the prior incident.
-  * Outer shell additionally caps ``ulimit -v`` via lib/setup_ulimit.sh.
+  * Outer shell additionally caps ``ulimit -v`` via
+    scripts/lib/setup_ulimit.sh.
 
 Per-chunk step boundary:
   ``estimate_timeseries_batch`` calls ``torch.linalg.lstsq`` exactly
@@ -44,9 +45,10 @@ from torch.profiler import (
 def _drive_invert_network(template_path: str, work_dir: str) -> int:
     """Run the invert_network step exactly as the CLI would.
 
-    Force re-run by removing prior outputs (matches run_profile_pyspy.sh
-    and run_chunk_sweep.sh: gpuChunkSize is not in MintPy's update-mode
-    key list, so leftover h5 files would silently skip the step).
+    Force re-run by removing prior outputs (matches
+    scripts/run_profile_pyspy.sh and scripts/run_chunk_sweep.sh:
+    gpuChunkSize is not in MintPy's update-mode key list, so leftover
+    h5 files would silently skip the step).
     """
     for fname in ('timeseries.h5', 'temporalCoherence.h5', 'numInvIfgram.h5'):
         try:

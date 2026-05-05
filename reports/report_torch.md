@@ -2,18 +2,18 @@
 
 Date: 2026-04-26 (JST)
 Subject: 18-step run of `smallbaselineApp.py` with `mintpy.networkInversion.backend = torch` enabled
-Harness: [benchmark/run_bench.sh](run_bench.sh)
-GPU template: [FernandinaSenDT128_torch.txt](FernandinaSenDT128_torch.txt)
+Harness: [benchmark/run_bench.sh](../scripts/run_bench.sh)
+GPU template: [FernandinaSenDT128_torch.txt](../fixtures/FernandinaSenDT128_torch.txt)
 
 Log set:
 
 | Label | Storage | backend | Log directory | Inverted pixels |
 |---|---|---|---|--:|
-| **NAS-CPU** (reference) | NAS (CIFS) | cpu | [logs_baseline/](logs_baseline/) | 157,667 |
-| **SSD-CPU** | Local NVMe | cpu | [logs_cpu_local/](logs_cpu_local/) | 269,999 |
-| **SSD-Torch** | Local NVMe | torch | [logs_torch/](logs_torch/) | 269,999 |
+| **NAS-CPU** (reference) | NAS (CIFS) | cpu | [logs_baseline/](../logs_baseline/) | 157,667 |
+| **SSD-CPU** | Local NVMe | cpu | [logs_cpu_local/](../logs_cpu_local/) | 269,999 |
+| **SSD-Torch** | Local NVMe | torch | [logs_torch/](../logs_torch/) | 269,999 |
 
-Implementation: [`src/mintpy/ifgram_inversion_gpu.py`](../src/mintpy/ifgram_inversion_gpu.py) + dispatch in [`src/mintpy/ifgram_inversion.py`](../src/mintpy/ifgram_inversion.py)
+Implementation: [`src/mintpy/ifgram_inversion_gpu.py`](../../src/mintpy/ifgram_inversion_gpu.py) + dispatch in [`src/mintpy/ifgram_inversion.py`](../../src/mintpy/ifgram_inversion.py)
 Commit: [8ab560fb](https://github.com/s-sasaki-earthsea-wizard/MintPy/commit/8ab560fb)
 
 ---
@@ -92,7 +92,7 @@ Wall-clock time as measured by `/usr/bin/time -v` (Python startup included). The
 
 ### Sanity check on the GPU path
 
-From [logs_torch/invert_network.log](logs_torch/invert_network.log):
+From [logs_torch/invert_network.log](../logs_torch/invert_network.log):
 
 ```
 estimating time-series via torch backend (batched, GPU)
@@ -106,7 +106,7 @@ estimating time-series via torch batched WLS in 14 chunk(s) of up to 19403 pixel
 
 ## 5. Numerical equivalence
 
-### Unit tests ([tests/test_ifgram_inversion_gpu.py](../tests/test_ifgram_inversion_gpu.py))
+### Unit tests ([tests/test_ifgram_inversion_gpu.py](../../tests/test_ifgram_inversion_gpu.py))
 
 On synthetic data (98 dates × 288 pairs, same shape as FernandinaSenDT128):
 

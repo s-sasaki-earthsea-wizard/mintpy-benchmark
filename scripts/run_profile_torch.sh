@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
-# Profile invert_network step with py-spy (Python sampling, hot path).
+# Profile invert_network step with torch.profiler (kernel-level breakdown).
 #
-# All output under ${LOG_DIR} is untracked per benchmark/.gitignore;
-# numerical findings are transcribed into ../report_profile.md so the
-# report itself is the canonical record.
+# Companion to run_profile_pyspy.sh. py-spy answers "which Python lines
+# are hot"; this script answers "which CUDA kernels inside
+# torch.linalg.lstsq dominate, and what is the H2D / compute / D2H
+# balance". Two profilers, two questions.
 #
-# Output layout (under ${LOG_DIR}, all untracked):
-#   pyspy.svg                # flamegraph
+# OOM-safety: the prior incident (2026-05-02) was caused by
+# torch.profiler with no schedule + with_stack=True. The harness
+# (profile_torch.py) defaults to schedule(wait=1, warmup=1, active=3,
+# repeat=1) with on_trace_ready disk flush, with_stack=False, and the
+# outer ulimit guard from lib/setup_ulimit.sh.
+#
+# Output layout (under ${LOG_DIR}, all untracked per .gitignore):
+#   tb_trace/                # Chrome trace JSON, one per active cycle
+#   key_averages.txt         # human-readable kernel summary
 #   run.log                  # full stdout/stderr (incl. "Time used:")
 #   run.time                 # /usr/bin/time -v rusage
 #   nvidia-smi.txt / free.txt / top.txt / uname.txt   # env snapshot
@@ -14,12 +22,12 @@
 
 set -u
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK_DIR="${WORK_DIR:-$HOME/MintPy_bench/FernandinaSenDT128/mintpy}"
-TEMPLATE_BASE="${TEMPLATE:-${REPO_ROOT}/benchmark/FernandinaSenDT128_torch.txt}"
-LOG_DIR="${1:-${REPO_ROOT}/benchmark/logs_profile_pyspy_$(date +%Y%m%d_%H%M%S)}"
+TEMPLATE_BASE="${TEMPLATE:-${REPO_ROOT}/benchmark/fixtures/FernandinaSenDT128_torch.txt}"
+LOG_DIR="${1:-${REPO_ROOT}/benchmark/logs_profile_torch_$(date +%Y%m%d_%H%M%S)}"
 PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
-PYSPY_BIN="${REPO_ROOT}/.venv/bin/py-spy"
+HARNESS="${REPO_ROOT}/benchmark/tools/profile_torch.py"
 
 # Cap host VA at 80% of physical RAM (see lib/setup_ulimit.sh for why)
 source "$(dirname "$0")/lib/setup_ulimit.sh"
@@ -34,24 +42,16 @@ uname -a   > "${LOG_DIR}/uname.txt"
 
 # Per-run template. Always emit gpuChunkSize even for the auto case:
 # MintPy preserves stale values in work_dir/smallbaselineApp.cfg when
-# the new template does not override (see logs from chunk_sweep session).
+# the new template does not override (matches run_profile_pyspy.sh).
 TEMPLATE="${LOG_DIR}/template.txt"
 cp "${TEMPLATE_BASE}" "${TEMPLATE}"
 printf '\n# profile run: explicit auto chunk size to defeat cfg-merge stale value\nmintpy.networkInversion.gpuChunkSize = 0\n' >> "${TEMPLATE}"
-
-cd "${WORK_DIR}"
-
-# Force re-inversion. --dostep invert_network honours --update; gpuChunkSize
-# is not in the update-mode key list, so leftover outputs would skip the step.
-rm -f "${WORK_DIR}/timeseries.h5" \
-      "${WORK_DIR}/temporalCoherence.h5" \
-      "${WORK_DIR}/numInvIfgram.h5"
 
 LOG="${LOG_DIR}/run.log"
 TIMEFILE="${LOG_DIR}/run.time"
 
 {
-  echo "Profile run (py-spy) starting at $(date -Iseconds)"
+  echo "Profile run (torch.profiler) starting at $(date -Iseconds)"
   echo "Repo root:     ${REPO_ROOT}"
   echo "Work dir:      ${WORK_DIR}"
   echo "Template:      ${TEMPLATE}"
@@ -59,24 +59,21 @@ TIMEFILE="${LOG_DIR}/run.time"
   echo
 } | tee "${LOG}"
 
-# PYTHONUNBUFFERED ensures smallbaselineApp's "Time used:" line reaches the
-# log even when stdout is redirected (block-buffered otherwise).
+# PYTHONUNBUFFERED ensures smallbaselineApp's "Time used:" line reaches
+# the log even when stdout is redirected (block-buffered otherwise).
 export PYTHONUNBUFFERED=1
 
 /usr/bin/time -v -o "${TIMEFILE}" \
-    "${PYSPY_BIN}" record \
-        -o "${LOG_DIR}/pyspy.svg" \
-        --format flamegraph \
-        --rate 100 \
-        --idle \
-        --subprocesses \
-        -- "${PYTHON_BIN}" -m mintpy.cli.smallbaselineApp "${TEMPLATE}" --dostep invert_network \
+    "${PYTHON_BIN}" "${HARNESS}" \
+        --template "${TEMPLATE}" \
+        --work-dir "${WORK_DIR}" \
+        --out-dir "${LOG_DIR}/tb_trace" \
     >> "${LOG}" 2>&1
 EC=$?
 
 {
   echo
-  echo "Profile run (py-spy) finished at $(date -Iseconds), exit=${EC}"
+  echo "Profile run (torch.profiler) finished at $(date -Iseconds), exit=${EC}"
 } | tee -a "${LOG}"
 
 WALL=$(awk -F': ' '/Elapsed \(wall clock\)/ {print $2}' "${TIMEFILE}")
