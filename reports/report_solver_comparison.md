@@ -36,7 +36,7 @@ The result lines up with the prediction in [report_profile.md](report_profile.md
 | GPU driver / CUDA | CUDA 13.1 driver, nvcc 13.0 |
 | Target commit | `eedfaf17` (PR #9 merged, `_SOLVER='cholesky'` is the default) |
 | Work dir | `~/MintPy_bench/FernandinaSenDT128/mintpy/` (local NVMe SSD) |
-| Template | [`FernandinaSenDT128_torch.txt`](FernandinaSenDT128_torch.txt) + `mintpy.networkInversion.gpuChunkSize = 0` (auto) |
+| Template | [`FernandinaSenDT128_torch.txt`](../fixtures/FernandinaSenDT128_torch.txt) + `mintpy.networkInversion.gpuChunkSize = 0` (auto) |
 | Solver switch | `_SOLVER` runtime override via env var `MINTPY_SOLVER` (this sibling repo's wrapper; MintPy itself untouched) |
 | Inverted pixels | 269,999 / 270,000 (avgSpatialCoh threshold 0.7, cold start) |
 
@@ -44,7 +44,7 @@ Harness (after the lstsq path was removed, retained for this report only as hist
 - bench: [`run_solver_comparison.sh`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/run_solver_comparison.sh) (3 shots/solver, pre-clean of h5, `/usr/bin/time -v`)
 - wrapper: [`run_smallbaseline_with_solver.py`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/run_smallbaseline_with_solver.py)
 - profile: [`profile_torch_solver.py`](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/profile_torch_solver.py) (solver-aware monkey-patch)
-- RMS: [`compare_solutions.py`](compare_solutions.py) (normalised by per-pixel std; kept as a generic h5 comparison tool)
+- RMS: [`compare_solutions.py`](../tools/compare_solutions.py) (normalised by per-pixel std; kept as a generic h5 comparison tool)
 
 ---
 
@@ -62,7 +62,7 @@ Wall clock from `/usr/bin/time -v` and the `Time used:` value MintPy itself repo
 | Wall mean (cholesky / lstsq) | 0.223 → **4.49× faster** |
 | Internal mean (cholesky / lstsq) | 0.0606 → **16.50× faster** |
 
-Raw artifacts: [bench/summary.tsv](logs_solver_run1/bench/summary.tsv)
+Raw artifacts: [bench/summary.tsv](../logs_solver_run1/bench/summary.tsv)
 
 ### On the wall vs internal gap
 
@@ -87,7 +87,7 @@ We compute the per-pixel RMS of `timeseries.h5` from each solver and normalise i
 
 Reference: per-pixel signal std of `ts_lstsq` is median 9.18 mm, p99 42.8 mm, max 113 mm.
 
-Raw artifacts: [compare/summary.txt](logs_solver_run1/compare/summary.txt) / [compare/rms_cholesky_vs_lstsq.json](logs_solver_run1/compare/rms_cholesky_vs_lstsq.json)
+Raw artifacts: [compare/summary.txt](../logs_solver_run1/compare/summary.txt) / [compare/rms_cholesky_vs_lstsq.json](../logs_solver_run1/compare/rms_cholesky_vs_lstsq.json)
 
 ### Interpreting the numerical equivalence
 
@@ -105,8 +105,8 @@ Raw artifacts: [compare/summary.txt](logs_solver_run1/compare/summary.txt) / [co
 Both solvers profiled with `torch.profiler` under `schedule(wait=1, active=1)` for one chunk. The per-chunk step boundary is enforced by monkey-patching the dispatch function (`_solve_cholesky` / `_solve_lstsq`) and inserting a single `prof.step()` per chunk ([profile_torch_solver.py @ 0682c4c](https://github.com/s-sasaki-earthsea-wizard/mintpy-benchmark/blob/0682c4c/profile_torch_solver.py)).
 
 Raw artifacts:
-- cholesky: [profile/cholesky/parsed.md](logs_solver_run1/profile/cholesky/parsed.md) / [key_averages.txt](logs_solver_run1/profile/cholesky/tb_trace/) / [trace.json](logs_solver_run1/profile/cholesky/tb_trace/) (139 KB)
-- lstsq: [profile/lstsq/parsed.md](logs_solver_run1/profile/lstsq/parsed.md) / [trace.json](logs_solver_run1/profile/lstsq/tb_trace/) (3.90 GiB; `key_averages` OOMs and is reduced offline by `parse_trace.py`, same procedure as [report_profile.md](report_profile.md))
+- cholesky: [profile/cholesky/parsed.md](../logs_solver_run1/profile/cholesky/parsed.md) / [key_averages.txt](../logs_solver_run1/profile/cholesky/tb_trace/) / [trace.json](../logs_solver_run1/profile/cholesky/tb_trace/) (139 KB)
+- lstsq: [profile/lstsq/parsed.md](../logs_solver_run1/profile/lstsq/parsed.md) / [trace.json](../logs_solver_run1/profile/lstsq/tb_trace/) (3.90 GiB; `key_averages` OOMs and is reduced offline by `parse_trace.py`, same procedure as [report_profile.md](report_profile.md))
 
 ### 4.1 Top-level (per chunk)
 
@@ -202,7 +202,7 @@ Measured (this report §2): cholesky internal/wall is 13.83 s / 61.34 s aggregat
 
 `prof.key_averages().table()` on the lstsq path tries to materialise every kineto event as a Python object. At this dataset size (15.94 M events even with `active=1`) it triggers a `std::bad_alloc`-class host-RSS spike (this run reached 45 GiB RSS before SIGINT). This is the known behaviour recorded as the 2026-05-03 incident in [report_profile.md](report_profile.md) (`key_averages.txt` is best-effort; `tb_trace/*.json` is authoritative).
 
-For this report, [`parse_trace.py`](parse_trace.py) reduces the trace JSON offline and obtains the kernel breakdown. The fact that `key_averages()` is interrupted partway is not an anomaly but the designed behaviour (the cholesky side has only 561 events and finishes instantly).
+For this report, [`parse_trace.py`](../tools/parse_trace.py) reduces the trace JSON offline and obtains the kernel breakdown. The fact that `key_averages()` is interrupted partway is not an anomaly but the designed behaviour (the cholesky side has only 561 events and finishes instantly).
 
 ### 6.2 Python startup overhead
 
