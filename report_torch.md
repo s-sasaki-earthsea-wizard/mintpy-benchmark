@@ -1,56 +1,56 @@
-# FernandinaSenDT128 GPU 化レポート (torch backend)
+# FernandinaSenDT128 GPU acceleration report (torch backend)
 
-実施日: 2026-04-26 (JST)
-対象: `mintpy.networkInversion.backend = torch` を有効化した状態での 18 ステップ計測
-計測スクリプト: [benchmark/run_bench.sh](run_bench.sh)
-GPU テンプレート: [FernandinaSenDT128_torch.txt](FernandinaSenDT128_torch.txt)
+Date: 2026-04-26 (JST)
+Subject: 18-step run of `smallbaselineApp.py` with `mintpy.networkInversion.backend = torch` enabled
+Harness: [benchmark/run_bench.sh](run_bench.sh)
+GPU template: [FernandinaSenDT128_torch.txt](FernandinaSenDT128_torch.txt)
 
-ログ一式:
+Log set:
 
-| ラベル | ストレージ | backend | ログディレクトリ | 反転対象 pixel |
+| Label | Storage | backend | Log directory | Inverted pixels |
 |---|---|---|---|--:|
-| **NAS-CPU** (参考) | NAS (CIFS) | cpu | [logs_baseline/](logs_baseline/) | 157,667 |
-| **SSD-CPU** | ローカル NVMe | cpu | [logs_cpu_local/](logs_cpu_local/) | 269,999 |
-| **SSD-Torch** | ローカル NVMe | torch | [logs_torch/](logs_torch/) | 269,999 |
+| **NAS-CPU** (reference) | NAS (CIFS) | cpu | [logs_baseline/](logs_baseline/) | 157,667 |
+| **SSD-CPU** | Local NVMe | cpu | [logs_cpu_local/](logs_cpu_local/) | 269,999 |
+| **SSD-Torch** | Local NVMe | torch | [logs_torch/](logs_torch/) | 269,999 |
 
-実装: [`src/mintpy/ifgram_inversion_gpu.py`](../src/mintpy/ifgram_inversion_gpu.py) + dispatch in [`src/mintpy/ifgram_inversion.py`](../src/mintpy/ifgram_inversion.py)
-コミット: [8ab560fb](https://github.com/s-sasaki-earthsea-wizard/MintPy/commit/8ab560fb)
+Implementation: [`src/mintpy/ifgram_inversion_gpu.py`](../src/mintpy/ifgram_inversion_gpu.py) + dispatch in [`src/mintpy/ifgram_inversion.py`](../src/mintpy/ifgram_inversion.py)
+Commit: [8ab560fb](https://github.com/s-sasaki-earthsea-wizard/MintPy/commit/8ab560fb)
 
 ---
 
-## 1. 計測条件
+## 1. Measurement conditions
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| マシン | Intel Core Ultra 9 285H (16C) / 93 GiB RAM / NVIDIA RTX 5080 (16 GiB, Blackwell sm_120) |
+| Machine | Intel Core Ultra 9 285H (16C) / 93 GiB RAM / NVIDIA RTX 5080 (16 GiB, Blackwell sm_120) |
 | OS | Ubuntu 24.04.3 LTS, kernel 6.17.0-20-generic |
-| Python | 3.12.3, `.venv/` (uv 管理) |
-| 主要ライブラリ | torch 2.11.0+cu128, numpy 2.4.4, scipy 1.17.1, h5py 3.16.0 |
+| Python | 3.12.3, `.venv/` (managed by uv) |
+| Key libraries | torch 2.11.0+cu128, numpy 2.4.4, scipy 1.17.1, h5py 3.16.0 |
 | GPU driver / CUDA | 590.48.01 / CUDA 13.1 driver, nvcc 13.0 |
-| 実行 | 18 step 全部を `--dostep` で 1 ステップ 1 プロセス (cold-start) |
+| Execution | All 18 steps run with `--dostep`, one process per step (cold start) |
 
-詳細は各 `logs_*/machine_info.txt` 参照。
+See each `logs_*/machine_info.txt` for full details.
 
 ---
 
-## 2. データセット規模 — NAS と SSD で `invert_network` の workload が違う件
+## 2. Dataset scale — `invert_network` workload differs between NAS and SSD
 
-NAS baseline (`logs_baseline/`) と SSD bench (`logs_cpu_local/`, `logs_torch/`) では `avgSpatialCoh.h5` (品質マスクの一部) の中身が異なり、`invert_network` の反転対象 pixel 数が違う:
+The NAS baseline (`logs_baseline/`) and the SSD benches (`logs_cpu_local/`, `logs_torch/`) see different contents in `avgSpatialCoh.h5` (part of the quality mask), so the number of pixels selected for inversion in `invert_network` differs:
 
-| バージョン | 反転対象 pixel | 比率 |
+| Variant | Inverted pixels | Ratio |
 |---|--:|--:|
 | NAS baseline | 157,667 | 58.4% |
 | SSD CPU / Torch | 269,999 | 100.0% |
 
-NAS baseline 取得時の `avgSpatialCoh.h5` は過去の処理結果が pre-existed で、約 11 万 pixel を zero マークしていたため有効ピクセルが少なくなっていた。一方 SSD bench は cold-start なので `quick_overview` が新規生成し、ほぼ全 pixel が有効と判定された。
+When the NAS baseline ran, `avgSpatialCoh.h5` already existed from a prior run and zero-marked roughly 110k pixels, leaving fewer valid pixels. The SSD benches ran cold-start, so `quick_overview` regenerated the file and almost every pixel was deemed valid.
 
-> **したがって NAS-CPU と SSD-CPU の `invert_network` 時間を直接比較するのは不公平**。本レポートでは **同条件で走っている SSD-CPU と SSD-Torch を apples-to-apples の比較対象**とし、NAS-CPU は参考値として併記する。
+> **It is therefore unfair to directly compare the `invert_network` time of NAS-CPU and SSD-CPU.** This report uses **SSD-CPU vs SSD-Torch as the apples-to-apples comparison**, with NAS-CPU listed only for reference.
 
 ---
 
-## 3. ステップ別 wall 時間
+## 3. Per-step wall time
 
-`/usr/bin/time -v` 計測の壁時計時間 (Python 起動含む)。`exit=1` の step は ERA5 grib キャッシュ不在による cascade failure ([§7](#7-bench-環境上の制約)) で、bench の主軸とは無関係。
+Wall-clock time as measured by `/usr/bin/time -v` (Python startup included). The steps with `exit=1` are cascade failures caused by a missing ERA5 grib cache ([§7](#7-bench-environment-constraints)) and are unrelated to the bench's main subject.
 
 | # | step | NAS-CPU (s) | SSD-CPU (s) | SSD-Torch (s) | exit |
 |--:|---|--:|--:|--:|:-:|
@@ -72,27 +72,27 @@ NAS baseline 取得時の `avgSpatialCoh.h5` は過去の処理結果が pre-exi
 | 16 | geocode | 30.27 | 17.85 | 19.88 | NAS:0 / SSD:1 |
 | 17 | google_earth | 30.21 | 18.57 | 20.45 | NAS:0 / SSD:1 |
 | 18 | hdfeos5 | 20.28 | 19.14 | 28.85 | 0 |
-| | **合計 wall** | **991** | **808** | **720** | |
+| | **total wall** | **991** | **808** | **720** | |
 
-⚠ NAS-CPU の `invert_network` は別 workload (157k vs 269k pixels) なので比較対象から除外。
+⚠ The NAS-CPU `invert_network` runs a different workload (157k vs 269k pixels) and is excluded from the comparison.
 
 ---
 
-## 4. `invert_network` の詳細 (apples-to-apples 比較)
+## 4. `invert_network` detail (apples-to-apples)
 
-`internal` は MintPy 自身が出力する `Time used:` 値。Python startup を除いた純粋処理時間。
+`internal` is the `Time used:` value MintPy itself reports — pure processing time with Python startup excluded.
 
-| バージョン | pixel | wall (s) | internal (s) | per-pixel internal (ms) | speedup vs SSD-CPU |
+| Variant | pixels | wall (s) | internal (s) | per-pixel internal (ms) | speedup vs SSD-CPU |
 |---|--:|--:|--:|--:|--:|
-| SSD-CPU (基準) | 269,999 | 386.09 | 367.0 | 1.359 | 1.00× |
+| SSD-CPU (baseline) | 269,999 | 386.09 | 367.0 | 1.359 | 1.00× |
 | **SSD-Torch** | 269,999 | 280.39 | **257.4** | **0.953** | **1.43×** |
-| NAS-CPU (別 workload) | 157,667 | 237.85 | 218.0 | 1.382 | — |
+| NAS-CPU (different workload) | 157,667 | 237.85 | 218.0 | 1.382 | — |
 
-**結果**: `invert_network` の internal で **1.43×** 高速化、wall で **1.38×** 高速化。
+**Result**: `invert_network` is **1.43×** faster on internal time and **1.38×** faster on wall.
 
-### GPU 経路の動作確認
+### Sanity check on the GPU path
 
-[logs_torch/invert_network.log](logs_torch/invert_network.log) より:
+From [logs_torch/invert_network.log](logs_torch/invert_network.log):
 
 ```
 estimating time-series via torch backend (batched, GPU)
@@ -100,89 +100,89 @@ GPU auto chunk_size = 19403 pixels (free VRAM 15.1 GiB)
 estimating time-series via torch batched WLS in 14 chunk(s) of up to 19403 pixels ...
 ```
 
-`mintpy.networkInversion.gpuChunkSize = 0` (auto) を採用、free VRAM 15.1 GiB から 19,403 pixel/chunk が選ばれ 14 chunks で完了。
+`mintpy.networkInversion.gpuChunkSize = 0` (auto) was used; from 15.1 GiB of free VRAM the auto-sizer picked 19,403 pixels per chunk and finished in 14 chunks.
 
 ---
 
-## 5. 数値等価性
+## 5. Numerical equivalence
 
-### 単体ユニットテスト ([tests/test_ifgram_inversion_gpu.py](../tests/test_ifgram_inversion_gpu.py))
+### Unit tests ([tests/test_ifgram_inversion_gpu.py](../tests/test_ifgram_inversion_gpu.py))
 
-合成データ (FernandinaSenDT128 と同形状の 98 dates × 288 pairs network) で:
+On synthetic data (98 dates × 288 pairs, same shape as FernandinaSenDT128):
 
-| ケース | 期待精度 | 結果 |
+| Case | Expected accuracy | Result |
 |---|---|:-:|
-| WLS, NaN なし | rms < 1e-5 × signal | ✅ |
-| WLS, 3% NaN (冗長 network) | rms < 1e-4 × signal | ✅ |
-| OLS, NaN なし | rms < 1e-5 × signal | ✅ |
-| min_norm_phase | rms < 1e-5 × signal | ✅ |
-| chunk size invariance | rtol 1e-6 | ✅ |
-| 未対応 backend → エラー | ValueError | ✅ |
+| WLS, no NaN | rms < 1e-5 × signal | OK |
+| WLS, 3% NaN (redundant network) | rms < 1e-4 × signal | OK |
+| OLS, no NaN | rms < 1e-5 × signal | OK |
+| min_norm_phase | rms < 1e-5 × signal | OK |
+| chunk size invariance | rtol 1e-6 | OK |
+| Unsupported backend → error | ValueError | OK |
 
-すべて float32 round-off レベルで CPU per-pixel scipy.lstsq と一致。
+All cases match the per-pixel CPU `scipy.lstsq` reference at the float32 round-off level.
 
-### 実データ smoke test (157,667 pixels, FernandinaSenDT128)
+### Real-data smoke test (157,667 pixels, FernandinaSenDT128)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| ts 出力中の NaN/Inf | **0 / 0** (15.4M 値中) |
-| tcoh 出力中の NaN/Inf | **0 / 0** |
-| tcoh の CPU との RMS 差 | **2.33e-7** (max 1.87e-5) |
+| NaN/Inf in `ts` output | **0 / 0** (out of 15.4M values) |
+| NaN/Inf in `tcoh` output | **0 / 0** |
+| RMS difference of `tcoh` vs CPU | **2.33e-7** (max 1.87e-5) |
 
-実データで rank-deficient pixel は出ず、CPU と float32 限界で一致。**`gels` driver の full-rank 仮定**は今回の dataset では問題なし。
+No rank-deficient pixels were observed on real data, and the result agrees with CPU to the float32 limit. **The full-rank assumption of the `gels` driver** poses no issue on this dataset.
 
 ---
 
-## 6. なぜ 1.4× にとどまったか
+## 6. Why only 1.4×
 
-`Time used: 257.4 s` (SSD-Torch internal) は単純な lstsq 時間ではなく、`run_ifgram_inversion_patch` 全体を含む:
+The `Time used: 257.4 s` figure (SSD-Torch internal) is not pure lstsq time — it covers all of `run_ifgram_inversion_patch`:
 
 ```
-read_stack_obs + ref_phase 引き当て + mask 構築   ┐
-                                                  ├─ ここは CPU の numpy / h5py のまま
-calc_weight_sqrt (coherence → weight 変換, chunked)┘
+read_stack_obs + ref_phase backfill + mask construction   ┐
+                                                          ├─ remains CPU numpy / h5py
+calc_weight_sqrt (coherence → weight, chunked)            ┘
 
-estimate_timeseries_batch (本コミットで GPU 化)   ── 主要 hot loop
+estimate_timeseries_batch (the hot loop GPU-ised by this commit) ── primary hot loop
 
-phase → meter 単位変換 + reshape                  ── ほぼ 0 秒
+phase → meter unit conversion + reshape                   ── ~0 s
 ```
 
-`estimate_timeseries_batch` 内では:
-- 14 chunks × 各 chunk で host→device コピー (`y`, `weight_sqrt`, `valid` mask)
+Inside `estimate_timeseries_batch`:
+- 14 chunks, with each chunk doing host→device copies (`y`, `weight_sqrt`, `valid` mask)
 - `torch.linalg.lstsq` (CUDA `gels` driver, batched)
-- tcoh 計算 + cumsum (GPU)
-- device→host コピー (`ts`, `tcoh`, `nobs`)
+- tcoh computation + cumsum (GPU)
+- device→host copies (`ts`, `tcoh`, `nobs`)
 
-`gels` driver は QR factorization で full-rank 前提の高速 path だが、batched でも cuSOLVER 上では `(num_pair, num_unknown) = (288, 97)` の行列を 19403 個並列に解く形なので、純粋な GEMM ほど効率は出ない (workspace allocation overhead, NaN-mask 処理用 weight 0 行の wasted FLOPs)。
+The `gels` driver is QR factorization on a fast full-rank path, but even batched, on cuSOLVER it solves 19,403 matrices of shape `(num_pair, num_unknown) = (288, 97)` in parallel — not as efficient as a pure GEMM (workspace allocation overhead, plus wasted FLOPs on weight-zero rows used to mask NaNs).
 
-**つまり「lstsq ループ自体は GPU 化されたが、その前後の CPU 処理 (read, weight) と GPU 計算内の overhead が無視できないサイズ」になっており、1.4× が現状の上限**。プロファイリングで分解すれば内訳が出る (§8 follow-up)。
-
----
-
-## 7. bench 環境上の制約
-
-`SSD-CPU` / `SSD-Torch` 両方で `correct_troposphere` 以降の一部 step が `exit=1` (cascade failure) となった。原因は **PyAPS が必要とする ERA5 grib キャッシュ**が SSD copy には存在せず、`number of grib files used: 0` で `progressBar` が ZeroDivisionError を投げたため (`src/mintpy/objects/progress.py:109`)。NAS baseline では何らかのキャッシュ経路で grib が解決していた。
-
-bench の主軸 (`invert_network`) には影響なし。GPU bench/CPU bench で同じ step が同じ理由で落ちており、比較性は保たれている。
+**In short, the lstsq loop itself is GPU-ised, but the surrounding CPU work (read, weight) and the GPU-side overhead inside the kernel are non-trivial, capping the current speedup at 1.4×.** Profiling will break this down into components (§8 follow-up).
 
 ---
 
-## 8. 次のアクション (follow-ups)
+## 7. Bench environment constraints
 
-| # | タスク | 期待効果 |
+A subset of steps starting at `correct_troposphere` reported `exit=1` (cascade failure) on both `SSD-CPU` and `SSD-Torch`. The cause is **a missing ERA5 grib cache that PyAPS requires**: it was not present in the SSD copy, so `number of grib files used: 0` led `progressBar` to raise `ZeroDivisionError` (`src/mintpy/objects/progress.py:109`). On the NAS baseline some prior cache path resolved the grib successfully.
+
+The bench's main subject (`invert_network`) is unaffected: GPU and CPU benches fail the same steps for the same reason, so comparability is preserved.
+
+---
+
+## 8. Follow-ups
+
+| # | Task | Expected impact |
 |--:|---|---|
-| 1 | `invert_network` を py-spy / cProfile で profile し、read / weight / lstsq / コピー の内訳を出す | speedup の上限を数値で説明 |
-| 2 | `calc_weight_sqrt` の GPU 化 (chunked numpy → torch) | weight 計算 (~25 s/run 推定) の削減 |
-| 3 | `--backend cupy` 実装 + bench 比較 | CuPy vs PyTorch の特性比較 |
-| 4 | rank-deficient pixel に対する CPU fallback | 別 dataset で必要になった場合の対策 |
-| 5 | ERA5 grib キャッシュの環境整備 | bench full-pipeline 化 |
-| 6 | upstream PR 化 (Wiki [Upstream-PR-Checklist](https://github.com/s-sasaki-earthsea-wizard/MintPy/wiki/Upstream-PR-Checklist) 準拠) | insarlab/MintPy への還元 |
+| 1 | Profile `invert_network` with py-spy / cProfile and break out read / weight / lstsq / copy | Quantify the speedup ceiling |
+| 2 | GPU-ise `calc_weight_sqrt` (chunked numpy → torch) | Cut weight build (~25 s/run estimated) |
+| 3 | Add `--backend cupy` and bench it | Compare CuPy vs PyTorch characteristics |
+| 4 | CPU fallback for rank-deficient pixels | Insurance for datasets that need it |
+| 5 | Stand up an ERA5 grib cache for benches | Enable full-pipeline benches |
+| 6 | Promote to an upstream PR (per the Wiki [Upstream-PR-Checklist](https://github.com/s-sasaki-earthsea-wizard/MintPy/wiki/Upstream-PR-Checklist)) | Contribute back to insarlab/MintPy |
 
 ---
 
-## 9. 結論
+## 9. Conclusions
 
-- `mintpy.networkInversion.backend = torch` は実データで **NaN/Inf を発生させず、CPU と float32 round-off レベルで数値一致**
-- `invert_network` の internal time で **1.43× / wall で 1.38×** の高速化
-- 純粋 lstsq 部分はほぼ GPU 化済み。残る改善余地は **計算前の weight 構築 (CPU bound)** と **chunk 切り替えの host↔device コピー**
-- defaults は upstream 互換 (`mintpy.networkInversion.backend = cpu`)、`--backend torch` または template flag で opt-in
+- `mintpy.networkInversion.backend = torch` produces **no NaN/Inf on real data and matches CPU at the float32 round-off level**.
+- `invert_network` is **1.43× faster on internal time and 1.38× faster on wall**.
+- The lstsq portion is essentially GPU-ised; the remaining headroom lies in the **CPU-bound weight construction** and **host↔device copies at chunk boundaries**.
+- Defaults stay upstream-compatible (`mintpy.networkInversion.backend = cpu`); users opt in via `--backend torch` or the template flag.
