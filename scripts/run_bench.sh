@@ -12,6 +12,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK_DIR="${WORK_DIR:-${REPO_ROOT}/FernandinaSenDT128/mintpy}"
 TEMPLATE="${TEMPLATE:-${REPO_ROOT}/docs/templates/FernandinaSenDT128.txt}"
 LOG_DIR="${1:-${REPO_ROOT}/benchmark/logs_baseline}"
+# Resolve LOG_DIR to an absolute path so log writes still work after we cd
+# into WORK_DIR below. -m allows the path not to exist yet.
+LOG_DIR="$(realpath -m -- "${LOG_DIR}")"
 PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
 SBA_BIN="${REPO_ROOT}/.venv/bin/smallbaselineApp.py"
 
@@ -19,10 +22,18 @@ mkdir -p "${LOG_DIR}"
 SUMMARY="${LOG_DIR}/summary.tsv"
 printf 'step\twall_seconds\tmax_rss_kb\texit_code\n' > "${SUMMARY}"
 
-STEPS=(load_data modify_network reference_point quick_overview correct_unwrap_error \
+# Default: full 18-step pipeline. Override with BENCH_STEPS env var
+# (whitespace-separated) to run a subset, e.g.
+#   BENCH_STEPS="invert_network" bash scripts/run_bench.sh ...
+DEFAULT_STEPS=(load_data modify_network reference_point quick_overview correct_unwrap_error \
        invert_network correct_LOD correct_SET correct_ionosphere correct_troposphere \
        deramp correct_topography residual_RMS reference_date velocity geocode \
        google_earth hdfeos5)
+if [[ -n "${BENCH_STEPS:-}" ]]; then
+    read -ra STEPS <<< "${BENCH_STEPS}"
+else
+    STEPS=("${DEFAULT_STEPS[@]}")
+fi
 
 cd "${WORK_DIR}"
 
