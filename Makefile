@@ -11,7 +11,7 @@
 # an empty string falls through to the script's own default.
 
 .DEFAULT_GOAL := help
-.PHONY: help bench bench-torch chunk-sweep profile-pyspy profile-torch
+.PHONY: help bench bench-torch bench-galapagos bench-galapagos-torch chunk-sweep profile-pyspy profile-torch
 
 # Forward WORK_DIR / TEMPLATE to recipe shells. LOG_DIR is positional, not env,
 # so it's not exported here -- each recipe passes "$(LOG_DIR)" explicitly.
@@ -28,6 +28,14 @@ bench: ## CPU baseline, all 18 steps (override TEMPLATE / WORK_DIR / LOG_DIR via
 
 bench-torch: ## GPU torch, all 18 steps (defaults TEMPLATE to fixtures/FernandinaSenDT128_torch.txt)
 	TEMPLATE="$${TEMPLATE:-$(CURDIR)/fixtures/FernandinaSenDT128_torch.txt}" \
+	    bash scripts/run_bench.sh "$(LOG_DIR)"
+
+bench-galapagos: ## CPU galapagos large scene (WORK_DIR required, defaults TEMPLATE to embedded inputs/GalapagosSenDT128.template)
+	TEMPLATE="$${TEMPLATE:-$${WORK_DIR}/inputs/GalapagosSenDT128.template}" \
+	    bash scripts/run_bench.sh "$(LOG_DIR)"
+
+bench-galapagos-torch: ## GPU torch galapagos large scene (WORK_DIR required, defaults TEMPLATE to fixtures/GalapagosSenDT128_torch.txt)
+	TEMPLATE="$${TEMPLATE:-$(CURDIR)/fixtures/GalapagosSenDT128_torch.txt}" \
 	    bash scripts/run_bench.sh "$(LOG_DIR)"
 
 chunk-sweep: ## gpuChunkSize sweep on invert_network (WORK_DIR required, ~55 min)
