@@ -1,5 +1,5 @@
 # GPU benchmark template — copy of docs/templates/FernandinaSenDT128.txt
-# with mintpy.networkInversion.backend = torch added at the end so the
+# with mintpy.networkInversion.solver = torch added at the end so the
 # invert_network step uses the GPU-batched solver.
 # vim: set filetype=cfg:
 ##------------------------------- ISCE/topsStack ----------------------##
@@ -40,4 +40,4 @@ mintpy.topographicResidual.stepDate = 20170910,20180613  #eruption dates
 mintpy.deramp                       = linear
 
 ##---------GPU acceleration of invert_network (fork-only, opt-in):
-mintpy.networkInversion.backend     = torch
+mintpy.networkInversion.solver      = torch
