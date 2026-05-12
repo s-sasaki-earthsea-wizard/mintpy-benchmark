@@ -17,9 +17,14 @@ git history.
 │   ├── run_chunk_sweep.sh
 │   ├── run_profile_pyspy.sh
 │   ├── run_profile_torch.sh
+│   ├── run_correct_topography_bench.sh       # (a) direct-call CPU vs GPU for dem_error
+│   ├── run_correct_topography_bench.py       # python harness driven by (a)
+│   ├── run_correct_topography_step_bench.sh  # (b) step-wall via smallbaselineApp.py --dostep
+│   ├── run_correct_topography_step_bench.py  # python driver driven by (b), monkeypatches solver
 │   └── lib/setup_ulimit.sh    # shared OOM safety net (sourced by every harness)
 ├── tools/                 # Python utilities the harness or analysis depend on
 │   ├── compare_solutions.py   # h5 RMS diff between two solver outputs
+│   ├── compare_dem_error_outputs.py # .npy RMS diff for correct_topography outputs
 │   ├── parse_trace.py         # offline reduction of torch.profiler trace JSON
 │   └── profile_torch.py       # torch.profiler driver invoked by run_profile_torch.sh
 ├── fixtures/
@@ -29,7 +34,11 @@ git history.
 │   ├── report_torch.md
 │   ├── report_chunk_sweep.md
 │   ├── report_profile.md
-│   └── report_solver_comparison.md
+│   ├── report_solver_comparison.md
+│   ├── report_large_scene.md
+│   └── dem_error/         # per-step subdirectories for newer GPU steps
+│       ├── report_fernandina.md
+│       └── report_galapagos.md
 ├── requirements.txt       # bench-only Python deps
 └── logs_*/                # untracked, machine-dependent — see .gitignore
 ```
@@ -44,10 +53,13 @@ by hand; raw artifacts stay on the developer's machine.
 | File | Subject |
 |---|---|
 | [`report_baseline.md`](reports/report_baseline.md) | NAS / SSD baselines on the CPU path |
-| [`report_torch.md`](reports/report_torch.md) | GPU torch backend on the same dataset |
+| [`report_torch.md`](reports/report_torch.md) | GPU torch backend on `invert_network` (Fernandina) |
 | [`report_chunk_sweep.md`](reports/report_chunk_sweep.md) | `gpuChunkSize` sweep on the torch backend |
 | [`report_profile.md`](reports/report_profile.md) | py-spy + torch.profiler breakdown of `invert_network` |
 | [`report_solver_comparison.md`](reports/report_solver_comparison.md) | Cholesky vs lstsq solver comparison |
+| [`report_large_scene.md`](reports/report_large_scene.md) | GPU torch backend on `invert_network` (Galapagos) |
+| [`dem_error/report_fernandina.md`](reports/dem_error/report_fernandina.md) | GPU torch backend on `correct_topography` (Fernandina) |
+| [`dem_error/report_galapagos.md`](reports/dem_error/report_galapagos.md) | GPU torch backend on `correct_topography` (Galapagos, 6.15× speedup) |
 
 The MintPy fork's [`docs/gpu.md`](https://github.com/s-sasaki-earthsea-wizard/MintPy/blob/main/docs/gpu.md)
 links to these reports as commit-pinned permalinks; existing SHA-pinned
@@ -105,6 +117,12 @@ make chunk-sweep WORK_DIR=$HOME/MintPy_bench/FernandinaSenDT128/mintpy
 # py-spy + torch.profiler on invert_network
 make profile-pyspy
 make profile-torch
+
+# correct_topography (DEM error) CPU vs GPU — direct-call wall + numeric diff
+bash scripts/run_correct_topography_bench.sh logs_correct_topo_fernandina_r2
+
+# correct_topography step wall via smallbaselineApp.py --dostep
+bash scripts/run_correct_topography_step_bench.sh logs_correct_topo_step_fernandina_r2
 ```
 
 Argument-passing contract:
