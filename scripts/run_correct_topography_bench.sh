@@ -36,7 +36,10 @@ WORK_DIR="${WORK_DIR:-${REPO_ROOT}/FernandinaSenDT128/mintpy}"
 TS_FILE="${TS_FILE:-${WORK_DIR}/timeseries_ERA5_ramp.h5}"
 GEOM_FILE="${GEOM_FILE:-${WORK_DIR}/inputs/geometryRadar.h5}"
 POLY_ORDER="${POLY_ORDER:-2}"
-STEP_DATES="${STEP_DATES:-20170910,20180613}"
+# Use `${VAR-default}` (no colon) so an explicitly-empty STEP_DATES="" — meaning
+# "no step jumps, e.g. for Galapagos" — does not fall back to the Fernandina
+# defaults. The colon form would treat empty as unset.
+STEP_DATES="${STEP_DATES-20170910,20180613}"
 EXCLUDE_DATES="${EXCLUDE_DATES:-}"
 CHUNK_SIZE="${CHUNK_SIZE:-}"
 LOG_DIR="${1:-${REPO_ROOT}/benchmark/logs_correct_topography_$(date +%Y%m%d_%H%M%S)}"

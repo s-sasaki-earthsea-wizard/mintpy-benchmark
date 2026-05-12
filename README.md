@@ -37,7 +37,8 @@ git history.
 │   ├── report_solver_comparison.md
 │   ├── report_large_scene.md
 │   └── dem_error/         # per-step subdirectories for newer GPU steps
-│       └── report_fernandina.md
+│       ├── report_fernandina.md
+│       └── report_galapagos.md
 ├── requirements.txt       # bench-only Python deps
 └── logs_*/                # untracked, machine-dependent — see .gitignore
 ```
@@ -58,6 +59,7 @@ by hand; raw artifacts stay on the developer's machine.
 | [`report_solver_comparison.md`](reports/report_solver_comparison.md) | Cholesky vs lstsq solver comparison |
 | [`report_large_scene.md`](reports/report_large_scene.md) | GPU torch backend on `invert_network` (Galapagos) |
 | [`dem_error/report_fernandina.md`](reports/dem_error/report_fernandina.md) | GPU torch backend on `correct_topography` (Fernandina) |
+| [`dem_error/report_galapagos.md`](reports/dem_error/report_galapagos.md) | GPU torch backend on `correct_topography` (Galapagos, 6.15× speedup) |
 
 The MintPy fork's [`docs/gpu.md`](https://github.com/s-sasaki-earthsea-wizard/MintPy/blob/main/docs/gpu.md)
 links to these reports as commit-pinned permalinks; existing SHA-pinned

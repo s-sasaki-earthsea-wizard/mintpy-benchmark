@@ -188,15 +188,20 @@ each script so both solvers share warm-cache state.
 3. **VRAM is comfortable.** 1.05 GiB / 16 GiB at full Fernandina; one
    chunk handles all 158k pixels. The auto-chunk path is exercised but
    not stressed.
-4. **Next bench target: GalapagosSenDT128** (3.4 M pixels, 475 ifgs;
-   ~22× more pixels and a wider `R × sin θ` swath). The
-   `invert_network` precedent on the same scene jumped from 4.49× to
-   36.4× step-wall going Fernandina → Galapagos because the solver
-   share dominates at scale. The same harness scripts parameterise
-   the work dir + ts file via env vars (`WORK_DIR=…`,
-   `TS_FILE=…` etc.) so the Galapagos run can drop straight in.
+4. **Galapagos follow-up complete** — see
+   [`report_galapagos.md`](report_galapagos.md). Direct-call wall
+   163.83 s → 26.66 s = **6.15×** at 3.4 M pixels, numerical
+   equivalence holds (rms / scale ≤ 7e-7), VRAM peak 7.6 GiB / 16
+   GiB. The Galapagos report's §5 contains the speedup-vs-scale
+   comparison and the structural explanation for why `correct_topography`
+   tops out at ~10× even at large scale (`P = 4–6` makes total flops
+   ~1000× smaller than `invert_network`, capping the GPU's
+   amortization).
 5. **Phase 2 structure exploit (`N_shared` row/col-scaling instead of
-   the full `(K, D, P)` allocation)** remains deferred. Fernandina
-   does not stress VRAM or kernel time enough to justify it; the
-   decision lives or dies on Galapagos numbers and kernel-time
-   breakdown.
+   the full `(K, D, P)` allocation) is dropped** on the combined
+   Fernandina + Galapagos evidence. Galapagos VRAM peak is 48% of a
+   16 GiB card and the kernel's compute share is sub-second; the
+   bottleneck is framework overhead (h5 read + masking + assemble),
+   not the solver allocation. Re-evaluate only if a future scene
+   stresses VRAM > 80% or kernel-time becomes the wall-time
+   bottleneck.
