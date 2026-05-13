@@ -1,0 +1,38 @@
+# GPU benchmark template — copy of docs/templates/KujuAlosAT422F650.txt
+# with mintpy.networkInversion.solver = torch added at the end so the
+# invert_network step uses the GPU-batched solver. Used by Issue #19
+# Tier 1 bench survey (extends Fernandina + Galapagos with an ALOS
+# L-band / ROI_PAC ingest path).
+#
+# Differences from docs/templates beyond the solver line:
+#   - mintpy.troposphericDelay.method = no       (skip ERA5 download;
+#                                                 bench runs on raw
+#                                                 timeseries.h5)
+#   - mintpy.save.hdfEos5            = no        (skip HE5 packaging)
+# vim: set filetype=cfg:
+########## 1. Load Data (--load to exit after this step)
+## auto - automatic path pattern for Univ of Miami file structure
+## load_data.py -H to check more details and example inputs.
+mintpy.load.processor      = roipac  #[isce,roipac,gamma,], auto for isce
+##---------interferogram datasets:
+mintpy.load.unwFile        = ./../interferograms/*/filt_*.unw      #[path2unw_file]
+mintpy.load.corFile        = ./../interferograms/*/filt_*.cor      #[path2cor_file]
+mintpy.load.connCompFile   = None                                  #[path2conn_file]
+mintpy.load.intFile        = None                                  #[path2int_file]
+##---------geometry datasets:
+mintpy.load.demFile        = ./../geometry/radar*.hgt              #[path2hgt_file]
+mintpy.load.lookupYFile    = ./../geometry/geomap*.trans           #[path2lookup_lat/y_file]
+mintpy.load.lookupXFile    = ./../geometry/geomap*.trans           #[path2lookup_lon/x_file]
+mintpy.load.incAngleFile   = None                                  #[path2los_file]
+mintpy.load.azAngleFile    = None                                  #[path2los_file]
+mintpy.load.shadowMaskFile = None                                  #[path2shadow_file]
+mintpy.load.waterMaskFile  = None                                  #[path2water_mask_file]
+
+##————————————————————————————— PROCESSING Options ——-----————————————————————##
+mintpy.reference.lalo               = 33.0655, 131.2076
+mintpy.troposphericDelay.method     = no   # bench: run on raw timeseries.h5
+mintpy.deramp                       = no
+mintpy.save.hdfEos5                 = no   # bench: skip HE5 packaging
+
+##---------GPU acceleration of invert_network (fork-only, opt-in):
+mintpy.networkInversion.solver      = torch
