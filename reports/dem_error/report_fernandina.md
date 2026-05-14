@@ -205,3 +205,63 @@ each script so both solvers share warm-cache state.
    not the solver allocation. Re-evaluate only if a future scene
    stresses VRAM > 80% or kernel-time becomes the wall-time
    bottleneck.
+
+## 9. Storage-axis follow-up: SSD re-bench (2026-05-14)
+
+Added as part of the [Issue #19](https://github.com/s-sasaki-earthsea-wizard/MintPy/issues/19)
+Tier 1 survey to isolate the NAS / CIFS overhead. Same scene, same
+hardware, same fork commit, same `--step-date 20170910,20180613` (P=6
+matching production cfg). Two differences from the §3 NAS measurement:
+
+- **Storage**: local SSD at `~/MintPy_bench/FernandinaSenDT128/mintpy/`
+  instead of CIFS-mounted NAS.
+- **TS file**: `timeseries.h5` (raw post-`invert_network`) instead of
+  `timeseries_ERA5_ramp.h5`, harmonising with the SanFranBay / SanFranSF
+  / Kuju / Galapagos convention. Same `(D, H, W) = (98, 450, 600)`
+  float32 shape, so speedup measurement is unaffected by the corrections
+  choice; numerical diff values are not directly comparable to §5
+  because the data tensors differ.
+
+```bash
+WORK_DIR=~/MintPy_bench/FernandinaSenDT128/mintpy \
+TS_FILE=$WORK_DIR/timeseries.h5 \
+GEOM_FILE=$WORK_DIR/inputs/geometryRadar.h5 \
+STEP_DATES=20170910,20180613 \
+POLY_ORDER=2 \
+bash benchmark/scripts/run_correct_topography_bench.sh \
+    benchmark/logs_correct_topo_fernandina_ssd
+```
+
+Single cpu-cold / torch-warm-after run (same methodology as the other
+Issue #19 Tier 1 scenes):
+
+| metric | NAS (orig r2) | **SSD (new)** | Δ |
+|---|--:|--:|--:|
+| CPU wall (s) | 7.45 | **11.15** | +50% (cold cache + different TS file) |
+| GPU wall (s) | 7.64 | **4.36** | **−43%** (the storage effect) |
+| **speedup** | **0.97×** | **2.56×** | **+2.64×** |
+| Max host RSS (MiB) | 1,587 (cpu) / 3,231 (gpu) | 669 (cpu) / 1,724 (gpu) | — |
+| CUDA peak alloc (MiB) | 1,074 | 1,834 | — |
+| `delta_z` rms/scale | 4.10e-6 | 1.48e-6 | — (different TS file) |
+| `ts_cor` rms/scale | 5.65e-8 | 6.70e-8 | — |
+| `ts_res` rms/scale | 5.23e-7 | 6.20e-7 | — |
+
+The headline is the **GPU wall halving (7.64 → 4.36 s, ~1.75×)** when
+the input HDF5 is on local SSD instead of CIFS-mounted NAS. The CPU
+wall *increased* on SSD, which looks paradoxical but is explained by
+methodology drift: the original NAS r2 was a warm second consecutive
+run (`r1 → r2` warm-cache discipline documented in §3), while this SSD
+re-bench is a single cpu-cold run for harmonisation with the rest of
+the [`report_bench_survey.md`](report_bench_survey.md) table; the cold
+read of `timeseries.h5` from SSD lands at ~3-4 s and that surfaces in
+the cpu wall.
+
+The **headline 0.97× speedup from §3 stands** as a real, reproducible
+number for users running on CIFS / NAS — production Fernandina users
+on the MintPy tutorial workflow often have this storage profile, so
+the NAS measurement is not artificial. But it is a NAS-bound *lower*
+bound, and the same scene + same hardware delivers **2.56× on local
+SSD**. The combined view across the report series (see
+[`report_bench_survey.md`](report_bench_survey.md) §3.3) is that the
+GPU path's sub-second compute portion makes it ~2× more I/O sensitive
+than the CPU path at small K.

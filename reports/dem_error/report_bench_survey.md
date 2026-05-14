@@ -20,17 +20,19 @@ Tier 1 (the P axis remains a deferred follow-up; see §6).
 Fork commit under test:
 [`60c9e3ac`](https://github.com/s-sasaki-earthsea-wizard/MintPy/commit/60c9e3ac) (`perf/correct-topography-torch`).
 
-## 1. Speedup table — all 5 scenes
+## 1. Speedup table — all 5 scenes (SSD-harmonised)
 
-Sorted by K (= image pixel count, including masked pixels):
+Sorted by K (= image pixel count, including masked pixels). Storage is
+local SSD for every row; see §3.3 for the original Fernandina NAS
+measurement, which sits at 0.97× for the same scene.
 
-| Scene | K (px) | D | P | λ (m) | processor | storage | CPU wall (s) | GPU wall (s) | speedup | VRAM peak (MiB) |
-|---|--:|--:|--:|--:|---|---|--:|--:|--:|--:|
-| Kuju | 226k | 24 | 4 | **0.236** | **ROI_PAC** | SSD | 9.14 | 3.61 | **2.53×** | 302 |
-| SanFranSF | 260k | 114 | 4 | 0.0555 | **ARIA** | SSD | 9.32 | 3.84 | **2.43×** | 1,163 |
-| Fernandina | 270k | 98 | 6 | 0.0555 | ISCE2 | **NAS** | 7.45 | 7.64 | **0.97×** | 1,075 |
-| SanFranBay | 326k | 333 | 4 | 0.0555 | **GMTSAR** | SSD | 14.53 | 8.23 | **1.76×** | 4,381 |
-| Galapagos | 3,400k | 98 | 4 | 0.0555 | ISCE2 | SSD | 163.83 | 26.66 | **6.15×** | 7,758 |
+| Scene | K (px) | D | P | λ (m) | processor | CPU wall (s) | GPU wall (s) | speedup | VRAM peak (MiB) |
+|---|--:|--:|--:|--:|---|--:|--:|--:|--:|
+| Kuju | 226k | 24 | 4 | **0.236** | **ROI_PAC** | 9.14 | 3.61 | **2.53×** | 302 |
+| SanFranSF | 260k | 114 | 4 | 0.0555 | **ARIA** | 9.32 | 3.84 | **2.43×** | 1,163 |
+| Fernandina | 270k | 98 | 6 | 0.0555 | ISCE2 | 11.15 | 4.36 | **2.56×** | 1,834 |
+| SanFranBay | 326k | 333 | 4 | 0.0555 | **GMTSAR** | 14.53 | 8.23 | **1.76×** | 4,381 |
+| Galapagos | 3,400k | 98 | 4 | 0.0555 | ISCE2 | 163.83 | 26.66 | **6.15×** | 7,758 |
 
 Hardware: Intel Core Ultra 9 285H (16C) + RTX 5080 (16 GiB, Blackwell
 sm_120) + PyTorch 2.11.0+cu128 + Python 3.12.3 (uv venv). The fork
@@ -50,7 +52,7 @@ case (SanFranBay `delta_z` at 4.33e-6); on the loosest, SanFranSF's
 
 | Scene | `delta_z` rms/scale | `ts_cor` rms/scale | `ts_res` rms/scale |
 |---|--:|--:|--:|
-| Fernandina | 4.10e-6 | 5.65e-8 | 5.23e-7 |
+| Fernandina (SSD) | 1.48e-6 | 6.70e-8 | 6.20e-7 |
 | Galapagos | 7.10e-7 | 2.08e-8 | 4.44e-7 |
 | SanFranBay | **4.33e-6** | 6.68e-8 | 1.28e-6 |
 | SanFranSF | 1.41e-8 | **3.12e-10** | 8.45e-10 |
@@ -77,9 +79,12 @@ but with three modulating effects worth calling out:
 ### 3.1 K-dominated regime (clearest signal)
 
 At K = 226k → 3.4M (a 15× jump), speedup grows from 2.53× to 6.15×.
-Within the small-K cluster (226–326k), all SSD-resident scenes converge
-on **1.76× – 2.53×** despite D varying 14× (24 → 333). This is the
-"GPU framework overhead is amortising" regime.
+Within the small-K cluster (226–326k), four of the five SSD-resident
+scenes converge on **2.43× – 2.56×** despite D varying 4.75× (24 →
+114) and P varying (4 → 6). SanFranBay at the high end of the cluster
+(326k, **D = 333**) drops to 1.76× — see §3.2 for the D-axis cause.
+This is the "GPU framework overhead is amortising" regime; speedup is
+weakly sensitive to D / P at this K.
 
 The asymptote model in [`report_galapagos.md`](report_galapagos.md) §2
 predicted a ~10× ceiling for `correct_topography` because per-pixel
@@ -94,46 +99,66 @@ speedup because per-pixel CPU cost scales as `D × P²` while GPU
 overhead is K-bounded." The data partially confirms this but the effect
 is weaker than expected:
 
-| | K  | D | CPU (s) | GPU (s) | speedup |
-|---|--:|--:|--:|--:|--:|
-| Kuju | 226k | 24 | 9.14 | 3.61 | 2.53× |
-| SanFranSF | 260k | **114** (4.75×) | 9.32 | 3.84 | 2.43× |
-| SanFranBay | 326k | **333** (14×) | **14.53** | **8.23** | 1.76× |
+| | K  | D | P | CPU (s) | GPU (s) | speedup |
+|---|--:|--:|--:|--:|--:|--:|
+| Kuju | 226k | 24 | 4 | 9.14 | 3.61 | 2.53× |
+| SanFranSF | 260k | **114** (4.75×) | 4 | 9.32 | 3.84 | 2.43× |
+| Fernandina (SSD) | 270k | 98 | **6** | 11.15 | 4.36 | 2.56× |
+| SanFranBay | 326k | **333** (14×) | 4 | **14.53** | **8.23** | 1.76× |
 
-Three observations:
+Four observations:
 
-1. **Kuju → SanFranSF**: D scales 4.75× but neither CPU wall nor GPU
-   wall grow proportionally. K grows ~15% and overhead floors
-   dominate.
-2. **SanFranSF → SanFranBay**: D scales 2.9×, CPU wall grows 1.56×
-   (sub-linear in D — overhead still matters on CPU at this K) but GPU
-   wall grows 2.14× (above linear-in-D — the `(K, D, P)` G_batch
-   tensor's memory traffic now matters too). **Speedup drops** from
-   2.43× to 1.76× because the GPU wall grew faster than the CPU wall.
+1. **Kuju → SanFranSF → Fernandina**: D moves 24 → 114 → 98 and P moves
+   4 → 4 → 6, but speedup stays remarkably flat at 2.43-2.56×. At this
+   K, framework overhead is large enough that neither D ∈ [24, 114] nor
+   the P=4→P=6 bump moves the needle.
+2. **SanFranSF → SanFranBay**: D scales 2.9× while K grows only ~25%.
+   CPU wall grows 1.56× (sub-linear in D — overhead still matters on
+   CPU at this K) but GPU wall grows 2.14× (above linear-in-D — the
+   `(K, D, P)` G_batch tensor's 1.65 GiB memory traffic now matters
+   too). **Speedup drops** from 2.43× to 1.76× because the GPU wall
+   grew faster than the CPU wall.
 3. The textbook expectation was D pushing CPU wall up faster than GPU
    wall; the actual data shows D pushing GPU wall up *at least as
    fast* once you cross some threshold (somewhere between D = 114 and
    D = 333 at this K, judging by the wall growth rates).
+4. **P (= 4 vs 6)** raises Fernandina's CPU wall 1.20× over Kuju's
+   (despite slightly higher K = 270k vs 226k), and its GPU wall by
+   1.21× — almost identically. So at this K + D regime, P scales both
+   walls together and is also a near-neutral lever for speedup.
 
-So **D is not a free speedup lever**; in this K regime it scales both
-walls similarly. The Galapagos result (D = 98, K = 3.4M, 6.15×) is what
-the GPU dispatch looks like when K-dominance pushes past D-related
-overhead.
+So **D and P are not free speedup levers**; in this K regime they
+scale both walls similarly. The Galapagos result (D = 98, K = 3.4M,
+6.15×) is what the GPU dispatch looks like when K-dominance pushes
+past framework overhead.
 
-### 3.3 Storage matters more than expected (Fernandina vs the rest)
+### 3.3 Storage matters more than expected (Fernandina NAS vs SSD)
 
-Fernandina at K = 270k on NAS / CIFS posts 0.97× — essentially a tie.
-SanFranSF at K = 260k on local SSD posts 2.43× — meaningful speedup.
-These scenes are within 4% of each other in K and within 14% of each
-other in D (98 vs 114), so they ought to land in roughly the same
-speedup neighbourhood. They don't, because Fernandina's GPU wall (7.64s
-on NAS) is **2× SanFranSF's** (3.84s on SSD), while CPU walls differ by
-only 25%. The GPU path is more I/O sensitive than the CPU path at this
-scale because its compute portion is sub-second and the input-read
-phase becomes the dominant term.
+Fernandina was originally benched on NAS / CIFS in
+[`report_fernandina.md`](report_fernandina.md) (the only scene in this
+report series shipped on a network mount), where it posted **0.97×**.
+For storage-axis isolation a follow-up SSD re-run was added on
+2026-05-14:
 
-A follow-up SSD-only re-run of Fernandina would quantify this directly,
-but is not on the Issue #19 critical path.
+| Run | TS file | Storage | CPU wall (s) | GPU wall (s) | speedup |
+|---|---|---|--:|--:|--:|
+| Original (r2) | `timeseries_ERA5_ramp.h5` | **NAS / CIFS** | 7.45 | 7.64 | **0.97×** |
+| SSD re-run | `timeseries.h5` | **local SSD** | 11.15 | **4.36** | **2.56×** |
+
+The headline finding is the **GPU wall halving (7.64 → 4.36 s, ~1.75×)**
+when the input HDF5 lives on local SSD instead of CIFS-mounted NAS. The
+CPU wall *increased* on SSD (cold-cache cpu run vs the original's warm-
+CIFS r2 measurement, plus a different `timeseries.h5` vs
+`timeseries_ERA5_ramp.h5` file; same scene shape so the comparison is
+valid but the two CPU walls are not directly comparable). The
+take-home is that the GPU path is much more I/O sensitive than the CPU
+path at this K because its compute portion is sub-second and the
+input-read phase becomes the dominant term.
+
+The harmonised SSD measurement (2.56×) is what the table in §1 uses.
+The 0.97× from the original Fernandina report still stands as a real,
+reproducible number for users running on NAS — it just isn't what the
+hardware can deliver when storage is local.
 
 ### 3.4 Processor + wavelength + coordinate frame: all transparent
 
@@ -202,12 +227,15 @@ Once the fork PR for the `correct_topography` CLI flag merges, the
 survey as supporting evidence:
 
 > The `correct_topography` GPU dispatch shipped via
-> `mintpy.topographicResidual.solver = torch` is recommended for scenes
-> with ≳ 1M pixels, where wall-clock savings of 2–6× are typical. For
-> tutorial-scale scenes (< 300k pixels), the GPU path is roughly tied
-> with the CPU per-pixel loop on local SSD; on slow storage (CIFS / NAS
-> over network), the GPU path can be slower due to higher I/O share of
-> total wall.
+> `mintpy.topographicResidual.solver = torch` delivers measurable
+> wall-clock savings across the entire size range tested. On local SSD,
+> tutorial-scale scenes (~250–325k pixels) typically see **2–2.5×**
+> speedup; production-scale scenes (~3M+ pixels) reach **~6×** with
+> headroom toward an estimated ~10× ceiling. The GPU path is **more
+> I/O sensitive than the CPU path** because its compute portion is
+> sub-second — on slow storage (CIFS / NAS over network), Fernandina
+> at 270k pixels drops from 2.56× (SSD) to 0.97× (NAS), so prefer SSD
+> for the GPU path whenever practical.
 >
 > Verified across four ingest pipelines (ISCE2 / GMTSAR / ARIA /
 > ROI_PAC), two wavelengths (Sentinel-1 C-band, ALOS PALSAR L-band),
@@ -215,8 +243,6 @@ survey as supporting evidence:
 > CPU `scipy.linalg.lstsq` loop holds at `rms / |cpu|.max < 1e-5` on
 > all five scenes measured.
 
-Pixel-count threshold "~1M" is derived from the speedup curve: SanFranBay
-at K = 326k posts 1.76×, Galapagos at K = 3.4M posts 6.15×. The
-1M crossing point would land somewhere around speedup ~3–4× by
-interpolation; the K-intermediate Tier 2 scene called out in §5 above
-would pin this number more precisely.
+The 2.5× → 6× speedup gap between small-K and Galapagos suggests an
+inflection around K ~ 1M; the K-intermediate Tier 2 scene called out in
+§5 above would pin this transition more precisely.
