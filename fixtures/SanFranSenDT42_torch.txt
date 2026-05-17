@@ -21,7 +21,11 @@ mintpy.deramp               = no
 
 ## options to speedup the processing (fast but not the best)
 mintpy.networkInversion.weightFunc              = no
-mintpy.topographicResidual.pixelwiseGeometry    = no
+# `mintpy.topographicResidual.pixelwiseGeometry = no` was set in the
+# Issue #19 Tier 1 direct-call fixture to skip the pixelwise path
+# entirely. For the Issue #21 end-to-end bench we let it default to
+# `yes` so the GPU correct_topography solver is actually exercised
+# (the `= no` mean-geometry path bypasses mintpy.gpu.dem_error).
 
 ##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver                  = torch

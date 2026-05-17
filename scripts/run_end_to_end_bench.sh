@@ -63,10 +63,26 @@ PYTHON_BIN="${PYTHON_BIN:-${HOME}/MintPy_bench/.venv/bin/python}"
 SBA_BIN="${SBA_BIN:-${HOME}/MintPy_bench/.venv/bin/smallbaselineApp.py}"
 FRESH="${FRESH:-1}"
 
-# Per-scene metadata. NEEDS_ERA5 = 1 means the template's
-# troposphericDelay.method defaults to pyaps and will pull ERA5;
-# 0 means the template explicitly sets `... = no`. ERA5_CACHE is a
-# pre-existing ERA5.h5 to symlink (may not exist on first run).
+# Per-scene metadata. NEEDS_ERA5 = 1 means the templates' tropo step
+# uses pyaps and will pull ERA5; 0 means both templates explicitly set
+# `troposphericDelay.method = no`. ERA5_CACHE is a pre-existing
+# ERA5.h5 to symlink (may not exist on first run).
+#
+# Layout convention: SCENE_ROOT is the directory containing the
+# `merged/` (or processor-equivalent) raw data subdirs and the
+# `mintpy_e2e_{cpu,torch}/` workdirs. Tar-extracted Zenodo scenes are
+# already nested one level deep, so SCENE_ROOT points to that inner
+# directory; the FernandinaSenDT128/GalapagosSenDT128 SSD layouts are
+# flat (no nesting).
+#
+# Templates: every scene uses paired cpu/torch fixtures under
+# benchmark/fixtures/. The fixtures differ from each other only by the
+# 2 solver lines (mintpy.{networkInversion,topographicResidual}.solver),
+# guaranteeing fair-comparison alignment of all other processing
+# options. The previous design used docs/templates/<scene>.txt for the
+# cpu side, but those upstream files diverge from the torch fixtures on
+# tropo / pixelwiseGeometry / weightFunc for several scenes, which
+# would bias the wall comparison.
 case "${SCENE}" in
     FernandinaSenDT128)
         # SSD-resident layout (warm-SSD per Issue #21 acceptance
@@ -74,33 +90,48 @@ case "${SCENE}" in
         # for upstream/tutorial code paths that read it; only this
         # bench's workdirs and ERA5 cache live on the SSD sibling tree.
         SCENE_ROOT="${HOME}/MintPy_bench/FernandinaSenDT128"
-        CPU_TEMPLATE="${REPO_ROOT}/docs/templates/FernandinaSenDT128.txt"
+        CPU_TEMPLATE="${BENCH_ROOT}/fixtures/FernandinaSenDT128_cpu.txt"
         NEEDS_ERA5=1
         ERA5_CACHE="${HOME}/MintPy_bench/FernandinaSenDT128/mintpy/inputs/ERA5.h5"
+        PRESEED_H5_FROM=""
         ;;
     GalapagosSenDT128)
+        # Raw ISCE inputs (merged/, master/, baselines/) were cleaned
+        # up after the Issue #6 large-scene bench; only the loaded
+        # ifgramStack.h5 + geometryRadar.h5 remain at mintpy/inputs/.
+        # PRESEED_H5_FROM points to that directory so the harness can
+        # symlink the h5 files into both workdirs' inputs/, triggering
+        # smallbaselineApp's update-mode skip on load_data.
         SCENE_ROOT="${HOME}/MintPy_bench/GalapagosSenDT128"
-        CPU_TEMPLATE="${HOME}/MintPy_bench/GalapagosSenDT128/GalapagosSenDT128.template"
+        CPU_TEMPLATE="${BENCH_ROOT}/fixtures/GalapagosSenDT128_cpu.txt"
         NEEDS_ERA5=1
         ERA5_CACHE="${HOME}/MintPy_bench/GalapagosSenDT128/mintpy/inputs/ERA5.h5"
+        PRESEED_H5_FROM="${HOME}/MintPy_bench/GalapagosSenDT128/mintpy/inputs"
+        # Galapagos fixture references $GALAPAGOS_DIR in load.* paths;
+        # those paths won't be touched once update-mode skips load_data,
+        # but the env var must still resolve so the template parses.
+        export GALAPAGOS_DIR="${HOME}/MintPy_bench"
         ;;
     KujuAlosAT422F650)
-        SCENE_ROOT="${HOME}/MintPy_bench/KujuAlosAT422F650"
-        CPU_TEMPLATE="${REPO_ROOT}/docs/templates/KujuAlosAT422F650.txt"
+        SCENE_ROOT="${HOME}/MintPy_bench/KujuAlosAT422F650/KujuAlosAT422F650"
+        CPU_TEMPLATE="${BENCH_ROOT}/fixtures/KujuAlosAT422F650_cpu.txt"
         NEEDS_ERA5=0
         ERA5_CACHE=""
+        PRESEED_H5_FROM=""
         ;;
     SanFranSenDT42)
-        SCENE_ROOT="${HOME}/MintPy_bench/SanFranSenDT42"
-        CPU_TEMPLATE="${REPO_ROOT}/docs/templates/SanFranSenDT42.txt"
+        SCENE_ROOT="${HOME}/MintPy_bench/SanFranSenDT42/SanFranSenDT42"
+        CPU_TEMPLATE="${BENCH_ROOT}/fixtures/SanFranSenDT42_cpu.txt"
         NEEDS_ERA5=1
-        ERA5_CACHE="${HOME}/MintPy_bench/SanFranSenDT42/mintpy/inputs/ERA5.h5"
+        ERA5_CACHE="${HOME}/MintPy_bench/SanFranSenDT42/SanFranSenDT42/mintpy/inputs/ERA5.h5"
+        PRESEED_H5_FROM=""
         ;;
     SanFranBaySenD42)
-        SCENE_ROOT="${HOME}/MintPy_bench/SanFranBaySenD42"
-        CPU_TEMPLATE="${REPO_ROOT}/docs/templates/SanFranBaySenD42.txt"
+        SCENE_ROOT="${HOME}/MintPy_bench/SanFranBaySenD42/SanFranBaySenD42"
+        CPU_TEMPLATE="${BENCH_ROOT}/fixtures/SanFranBaySenD42_cpu.txt"
         NEEDS_ERA5=0
         ERA5_CACHE=""
+        PRESEED_H5_FROM=""
         ;;
     -h|--help)
         usage 0
@@ -148,6 +179,23 @@ if [[ "${FRESH}" -eq 1 ]]; then
     rm -rf "${WORK_DIR_CPU}" "${WORK_DIR_TORCH}"
 fi
 mkdir -p "${WORK_DIR_CPU}/inputs" "${WORK_DIR_TORCH}/inputs"
+
+# Pre-seed loaded HDF5 inputs (Galapagos only): the raw ISCE inputs
+# referenced by the template were cleaned up after the Issue #6 bench
+# and only ifgramStack.h5 + geometryRadar.h5 remain. Symlinking them
+# into both workdirs' inputs/ triggers smallbaselineApp's update-mode
+# skip on load_data so the bench measures the same product on both
+# sides without re-running ingest.
+if [[ -n "${PRESEED_H5_FROM}" && -d "${PRESEED_H5_FROM}" ]]; then
+    for h5 in ifgramStack.h5 geometryRadar.h5; do
+        src="${PRESEED_H5_FROM}/${h5}"
+        if [[ -f "${src}" ]]; then
+            ln -sf "${src}" "${WORK_DIR_CPU}/inputs/${h5}"
+            ln -sf "${src}" "${WORK_DIR_TORCH}/inputs/${h5}"
+        fi
+    done
+    echo "[Phase 0] Pre-seeded loaded h5 inputs from ${PRESEED_H5_FROM}"
+fi
 
 # Pre-seed ERA5 cache (best-effort): if a previous run's ERA5.h5 is
 # reachable, symlink it into both workdirs so the cpu and torch

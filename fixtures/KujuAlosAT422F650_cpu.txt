@@ -1,0 +1,31 @@
+# CPU baseline fixture for KujuAlosAT422F650 — derived from
+# docs/templates/KujuAlosAT422F650.txt with the same Issue #19 bench
+# overrides as fixtures/KujuAlosAT422F650_torch.txt
+# (`troposphericDelay.method = no` to skip ERA5 download for ALOS-1
+# L-band 2007-2011 data, `save.hdfEos5 = no` to skip HE5 packaging).
+# Differs from the torch fixture only by the trailing
+# `mintpy.*.solver = torch` lines so the wall comparison is fair.
+# vim: set filetype=cfg:
+########## 1. Load Data (--load to exit after this step)
+## auto - automatic path pattern for Univ of Miami file structure
+## load_data.py -H to check more details and example inputs.
+mintpy.load.processor      = roipac  #[isce,roipac,gamma,], auto for isce
+##---------interferogram datasets:
+mintpy.load.unwFile        = ./../interferograms/*/filt_*.unw      #[path2unw_file]
+mintpy.load.corFile        = ./../interferograms/*/filt_*.cor      #[path2cor_file]
+mintpy.load.connCompFile   = None                                  #[path2conn_file]
+mintpy.load.intFile        = None                                  #[path2int_file]
+##---------geometry datasets:
+mintpy.load.demFile        = ./../geometry/radar*.hgt              #[path2hgt_file]
+mintpy.load.lookupYFile    = ./../geometry/geomap*.trans           #[path2lookup_lat/y_file]
+mintpy.load.lookupXFile    = ./../geometry/geomap*.trans           #[path2lookup_lon/x_file]
+mintpy.load.incAngleFile   = None                                  #[path2los_file]
+mintpy.load.azAngleFile    = None                                  #[path2los_file]
+mintpy.load.shadowMaskFile = None                                  #[path2shadow_file]
+mintpy.load.waterMaskFile  = None                                  #[path2water_mask_file]
+
+##————————————————————————————— PROCESSING Options ——-----————————————————————##
+mintpy.reference.lalo               = 33.0655, 131.2076
+mintpy.troposphericDelay.method     = no   # bench: run on raw timeseries.h5
+mintpy.deramp                       = no
+mintpy.save.hdfEos5                 = no   # bench: skip HE5 packaging
