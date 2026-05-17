@@ -1,8 +1,10 @@
 # GPU benchmark template for GalapagosSenDT128 — copy of the dataset's
 # embedded inputs/GalapagosSenDT128.template (Zenodo record 4743058) with
-# mintpy.networkInversion.solver = torch added at the end so the
-# invert_network step uses the GPU-batched solver. The cpu baseline run
-# uses the embedded template directly (no solver line, defaults to cpu).
+# the two opt-in GPU solver flags added at the end so both the
+# invert_network and correct_topography steps use the GPU-batched
+# solvers. The cpu baseline run uses the embedded template directly
+# (no solver lines, defaults to cpu). Used by the Issue #21 end-to-end
+# bench harness.
 # vim: set filetype=cfg:
 ##----------------------------- SentinelStack/ISCE ---------------------##
 cleanopt                        = 1    # [ 0 / 1 / 2 / 3 4]   0: no cleaning, 1: largest files, 2: merged/etc, PROCESS dirs, 3: SLC,RAW, 4: everything
@@ -46,5 +48,6 @@ mintpy.unwrapError.method                = bridging+phase_closure   #[bridging /
 mintpy.topographicResidual.stepFuncDate  = 20150524,20150616,20170321,20170910,20180613  #Wolf,Wolf,CerroAzul,Fernandina,Fernandina
 mintpy.deramp                            = linear
 
-##---------GPU acceleration of invert_network (fork-only, opt-in):
+##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver           = torch
+mintpy.topographicResidual.solver        = torch

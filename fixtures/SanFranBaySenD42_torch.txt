@@ -1,8 +1,8 @@
 # GPU benchmark template — copy of docs/templates/SanFranBaySenD42.txt
-# with mintpy.networkInversion.solver = torch added at the end so the
-# invert_network step uses the GPU-batched solver. Used by Issue #19
-# Tier 1 bench survey (extends Fernandina + Galapagos with a GMTSAR
-# ingest path + D = 333).
+# with the two opt-in GPU solver flags added at the end so both the
+# invert_network and correct_topography steps use the GPU-batched
+# solvers. Used by Issue #19 Tier 1 bench survey (GMTSAR ingest path
+# + D = 333) and the Issue #21 end-to-end bench harness.
 # vim: set filetype=cfg:
 ## manually add the following metadata
 HEADING = -168
@@ -32,5 +32,6 @@ mintpy.troposphericDelay.method = no
 mintpy.deramp                   = no
 mintpy.topographicResidual      = yes
 
-##---------GPU acceleration of invert_network (fork-only, opt-in):
+##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver  = torch
+mintpy.topographicResidual.solver = torch

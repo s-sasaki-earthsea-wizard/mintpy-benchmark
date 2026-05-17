@@ -1,8 +1,8 @@
 # GPU benchmark template — copy of docs/templates/KujuAlosAT422F650.txt
-# with mintpy.networkInversion.solver = torch added at the end so the
-# invert_network step uses the GPU-batched solver. Used by Issue #19
-# Tier 1 bench survey (extends Fernandina + Galapagos with an ALOS
-# L-band / ROI_PAC ingest path).
+# with the two opt-in GPU solver flags added at the end so both the
+# invert_network and correct_topography steps use the GPU-batched
+# solvers. Used by Issue #19 Tier 1 bench survey (ALOS L-band /
+# ROI_PAC ingest path) and the Issue #21 end-to-end bench harness.
 #
 # Differences from docs/templates beyond the solver line:
 #   - mintpy.troposphericDelay.method = no       (skip ERA5 download;
@@ -34,5 +34,6 @@ mintpy.troposphericDelay.method     = no   # bench: run on raw timeseries.h5
 mintpy.deramp                       = no
 mintpy.save.hdfEos5                 = no   # bench: skip HE5 packaging
 
-##---------GPU acceleration of invert_network (fork-only, opt-in):
+##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver      = torch
+mintpy.topographicResidual.solver   = torch

@@ -1,6 +1,7 @@
 # GPU benchmark template — copy of docs/templates/FernandinaSenDT128.txt
-# with mintpy.networkInversion.solver = torch added at the end so the
-# invert_network step uses the GPU-batched solver.
+# with the two opt-in GPU solver flags added at the end so both the
+# invert_network and correct_topography steps use the GPU-batched
+# solvers. Used by the Issue #21 end-to-end bench harness.
 # vim: set filetype=cfg:
 ##------------------------------- ISCE/topsStack ----------------------##
 #ssaraopt = --platform=SENTINEL-1A,SENTINEL-1B -r 128 -f 589,590,591,592,593  -e 2017-07-01
@@ -39,5 +40,6 @@ mintpy.reference.lalo               = -0.30,-91.43
 mintpy.topographicResidual.stepDate = 20170910,20180613  #eruption dates
 mintpy.deramp                       = linear
 
-##---------GPU acceleration of invert_network (fork-only, opt-in):
+##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver      = torch
+mintpy.topographicResidual.solver   = torch
