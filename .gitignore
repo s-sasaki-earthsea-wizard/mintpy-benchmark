@@ -1,7 +1,9 @@
 # Bench / profile runs produce machine-dependent artifacts (wall time,
 # RSS, VRAM-derived auto chunk sizes, hostnames, /home paths) that have
 # no meaning on a different machine and previously leaked host info
-# into the public repo (audited 2026-05-02). The whole logs_*/ tree is
+# into the public repo (audited 2026-05-02). Anything matching logs_*
+# (directories like logs_baseline/ as well as the end-to-end harness's
+# top-level diff files like logs_e2e_<scene>_walls_diff.json) is
 # therefore untracked.
 #
 # What stays tracked under benchmark/: harness scripts (scripts/),
@@ -9,5 +11,5 @@
 # (reports/), the top-level Makefile, and requirements.txt.
 # Numerical findings are transcribed into the corresponding report
 # by hand; raw artifacts live only on the developer's machine.
-logs_*/
+logs_*
 __pycache__/
