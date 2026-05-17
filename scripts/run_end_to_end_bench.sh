@@ -69,10 +69,14 @@ FRESH="${FRESH:-1}"
 # pre-existing ERA5.h5 to symlink (may not exist on first run).
 case "${SCENE}" in
     FernandinaSenDT128)
-        SCENE_ROOT="${REPO_ROOT}/FernandinaSenDT128"
+        # SSD-resident layout (warm-SSD per Issue #21 acceptance
+        # criteria). The in-repo NAS-mounted copy is left untouched
+        # for upstream/tutorial code paths that read it; only this
+        # bench's workdirs and ERA5 cache live on the SSD sibling tree.
+        SCENE_ROOT="${HOME}/MintPy_bench/FernandinaSenDT128"
         CPU_TEMPLATE="${REPO_ROOT}/docs/templates/FernandinaSenDT128.txt"
         NEEDS_ERA5=1
-        ERA5_CACHE="${REPO_ROOT}/FernandinaSenDT128/mintpy/inputs/ERA5.h5"
+        ERA5_CACHE="${HOME}/MintPy_bench/FernandinaSenDT128/mintpy/inputs/ERA5.h5"
         ;;
     GalapagosSenDT128)
         SCENE_ROOT="${HOME}/MintPy_bench/GalapagosSenDT128"
