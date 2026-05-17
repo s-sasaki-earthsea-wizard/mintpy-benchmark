@@ -1,6 +1,64 @@
-# Benchmark / profiling tools (fork-only, not upstream).
-# torch.profiler ships with PyTorch (installed via [gpu] extras).
+# Benchmark dependencies (fork-only, not upstream).
 #
-# Install (in addition to the main env):
-#   uv pip install -r benchmark/requirements.txt
+# Two install patterns depending on what you need:
+#
+# (1) Profiling on top of the existing fork .venv
+#     (lightweight: just py-spy, doesn't touch the fork's pinned wheels):
+#
+#       uv pip install -r benchmark/requirements.txt
+#
+# (2) Scene preprocessing for bench harness inputs that need GDAL
+#     (GMTSAR .grd, ARIA VRT) — install in a *separate sibling venv* so
+#     the fork's [gpu] env stays clean and reproducible.
+#
+#     On Ubuntu/Debian, borrow the system GDAL binding (apt python3-gdal)
+#     instead of building from source. Source build needs python3-dev
+#     headers (Python.h) AND matches against the system libgdal version
+#     anyway, so the apt binding is the simpler path:
+#
+#       sudo apt install python3-gdal
+#       uv venv ~/MintPy_bench/.venv --python 3.12 --system-site-packages
+#       uv pip install -p ~/MintPy_bench/.venv/bin/python \
+#           -e .[gpu] -r benchmark/requirements.txt \
+#           --extra-index-url https://download.pytorch.org/whl/cu128 \
+#           --index-strategy unsafe-best-match
+#       uv pip install -p ~/MintPy_bench/.venv/bin/python "numpy<2"
+#
+#     The --system-site-packages flag lets the venv see system gdal. The
+#     extra `numpy<2` pin is required because apt's `gdal_array` shared
+#     object on Ubuntu 24.04 is built against numpy 1.x (apt python3-numpy
+#     = 1.26.4); a numpy 2.x in the venv triggers an ABI mismatch on first
+#     `bnd.ReadAsArray()`. Pinning back to 1.x in the venv matches apt's
+#     binding and is otherwise transparent for MintPy + torch 2.x.
+#
+#     On non-apt systems, drop --system-site-packages and let pip build
+#     gdal from source after installing python3-dev (the source build
+#     links against the venv's numpy, so no downgrade is needed there).
+#
+#     Then run preprocessing with that venv's interpreter:
+#       ~/MintPy_bench/.venv/bin/smallbaselineApp.py <scene>.cfg --end invert_network
+#     and switch back to the fork .venv for the bench harness itself
+#     (which only needs torch, no GDAL).
+#
+# torch.profiler ships with PyTorch (installed via [gpu] extras), so it's
+# not listed here.
+
 py-spy
+
+# GDAL Python binding (optional, commented out by default).
+#
+# Only required by `mintpy.prep_gmtsar` (GMTSAR .grd inputs) and
+# `mintpy.prep_aria` (ARIA VRT inputs). ROI_PAC / ISCE2-topsStack scenes do
+# not need GDAL at load_data time.
+#
+# On Ubuntu/Debian (recommended): use the apt path above — `sudo apt
+# install python3-gdal` + venv with --system-site-packages. The line below
+# stays commented because uv's resolver tries to satisfy explicit pins
+# from PyPI even when the package is already importable via system-site,
+# which would needlessly trigger a source build.
+#
+# On non-apt systems: uncomment the line below, install python3-dev so
+# Python.h is available, and let pip build gdal from source against your
+# /usr/lib/libgdal (the pin must match that libgdal version exactly).
+#
+# gdal==3.8.4

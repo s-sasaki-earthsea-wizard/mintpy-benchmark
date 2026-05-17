@@ -27,8 +27,12 @@ git history.
 │   ├── compare_dem_error_outputs.py # .npy RMS diff for correct_topography outputs
 │   ├── parse_trace.py         # offline reduction of torch.profiler trace JSON
 │   └── profile_torch.py       # torch.profiler driver invoked by run_profile_torch.sh
-├── fixtures/
-│   └── FernandinaSenDT128_torch.txt  # GPU template
+├── fixtures/                            # GPU bench templates (per scene)
+│   ├── FernandinaSenDT128_torch.txt
+│   ├── GalapagosSenDT128_torch.txt
+│   ├── SanFranBaySenD42_torch.txt       # GMTSAR, D=333 (Issue #19 Tier 1)
+│   ├── SanFranSenDT42_torch.txt         # ARIA (Issue #19 Tier 1)
+│   └── KujuAlosAT422F650_torch.txt      # ROI_PAC, ALOS L-band (Issue #19 Tier 1)
 ├── reports/               # commit-pinned by external links — do not rename / move
 │   ├── report_baseline.md
 │   ├── report_torch.md
@@ -38,7 +42,11 @@ git history.
 │   ├── report_large_scene.md
 │   └── dem_error/         # per-step subdirectories for newer GPU steps
 │       ├── report_fernandina.md
-│       └── report_galapagos.md
+│       ├── report_galapagos.md
+│       ├── report_sanfranbay.md         # Issue #19 Tier 1
+│       ├── report_sanfran_aria.md       # Issue #19 Tier 1
+│       ├── report_kuju.md               # Issue #19 Tier 1
+│       └── report_bench_survey.md       # 5-scene combined survey + speedup curve
 ├── requirements.txt       # bench-only Python deps
 └── logs_*/                # untracked, machine-dependent — see .gitignore
 ```
@@ -58,8 +66,12 @@ by hand; raw artifacts stay on the developer's machine.
 | [`report_profile.md`](reports/report_profile.md) | py-spy + torch.profiler breakdown of `invert_network` |
 | [`report_solver_comparison.md`](reports/report_solver_comparison.md) | Cholesky vs lstsq solver comparison |
 | [`report_large_scene.md`](reports/report_large_scene.md) | GPU torch backend on `invert_network` (Galapagos) |
-| [`dem_error/report_fernandina.md`](reports/dem_error/report_fernandina.md) | GPU torch backend on `correct_topography` (Fernandina) |
+| [`dem_error/report_fernandina.md`](reports/dem_error/report_fernandina.md) | GPU torch backend on `correct_topography` (Fernandina, NAS storage, 0.97×) |
 | [`dem_error/report_galapagos.md`](reports/dem_error/report_galapagos.md) | GPU torch backend on `correct_topography` (Galapagos, 6.15× speedup) |
+| [`dem_error/report_sanfranbay.md`](reports/dem_error/report_sanfranbay.md) | `correct_topography` on SanFranBaySenD42 (GMTSAR, D=333, 1.76×) — Issue #19 Tier 1 |
+| [`dem_error/report_sanfran_aria.md`](reports/dem_error/report_sanfran_aria.md) | `correct_topography` on SanFranSenDT42 (ARIA, 2.43×) — Issue #19 Tier 1 |
+| [`dem_error/report_kuju.md`](reports/dem_error/report_kuju.md) | `correct_topography` on KujuAlosAT422F650 (ROI_PAC, ALOS L-band, 2.53×) — Issue #19 Tier 1 |
+| [`dem_error/report_bench_survey.md`](reports/dem_error/report_bench_survey.md) | **Combined 5-scene survey** — speedup curve + numeric gate validation + Issue #19 axes coverage |
 
 The MintPy fork's [`docs/gpu.md`](https://github.com/s-sasaki-earthsea-wizard/MintPy/blob/main/docs/gpu.md)
 links to these reports as commit-pinned permalinks; existing SHA-pinned
