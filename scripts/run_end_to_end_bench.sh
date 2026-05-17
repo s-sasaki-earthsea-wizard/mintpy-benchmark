@@ -219,24 +219,31 @@ echo "  torch workdir: ${WORK_DIR_TORCH}"
 if [[ -f "${WALLS_OUT}" ]]; then
     echo
     "${PYTHON_BIN}" - "${WALLS_OUT}" "${PRODUCTS_OUT}" <<'PY'
-import json, sys
+import json, os, sys
 walls = json.loads(open(sys.argv[1]).read())
-prods = json.loads(open(sys.argv[2]).read()) if len(sys.argv) > 2 else None
+prods_path = sys.argv[2] if len(sys.argv) > 2 else None
+prods = (json.loads(open(prods_path).read())
+         if prods_path and os.path.isfile(prods_path) else None)
 t = walls["totals"]
 print(f"  GPU-able subtotal:  cpu={t['gpu_able_cpu_wall_s']:.1f}s  "
       f"torch={t['gpu_able_gpu_wall_s']:.1f}s  speedup={t['gpu_able_speedup']:.2f}x")
 print(f"  CPU-only subtotal:  cpu={t['cpu_only_cpu_wall_s']:.1f}s  "
       f"torch={t['cpu_only_gpu_wall_s']:.1f}s  ratio={t['cpu_only_ratio_gpu_over_cpu']:.3f}")
 if walls["cpu_only_regressions"]:
-    print(f"  CPU-only regressions (>±5%): {walls['cpu_only_regressions']}")
+    print(f"  CPU-only regressions: {walls['cpu_only_regressions']}")
 if prods:
     s = prods["summary"]
     print(f"  Product gates: {s['n_gate_pass']}/{s['n_compared']} pass "
           f"(threshold rms/scale < {prods['gate_threshold_rms_over_scale']})")
-    if s["n_gate_fail"]:
-        for p in prods["products"]:
-            if p.get("status") == "compared" and not p.get("gate_pass"):
-                print(f"    FAIL: {p['file']}  rms/scale={p['rms_over_scale']:.2e}")
+    for p in prods["products"]:
+        st = p.get("status")
+        if st == "compared" and not p.get("gate_pass"):
+            print(f"    FAIL: {p['file']}  rms/scale={p['rms_over_scale']:.2e}")
+        elif st in ("absent_in_one", "filename_mismatch",
+                    "dataset_key_error") and p.get("required"):
+            print(f"    {st}: {p['file']}")
+else:
+    print(f"  (products diff JSON missing — tool failed earlier)")
 PY
 fi
 

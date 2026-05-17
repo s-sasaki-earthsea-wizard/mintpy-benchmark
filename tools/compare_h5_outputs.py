@@ -12,10 +12,15 @@ of the pipeline:
     upstream of invert_network:
         timeseries.h5            (dataset: timeseries)
         temporalCoherence.h5     (dataset: temporalCoherence)
-        numInvIfgram.h5          (dataset: numInvIfgram)
+        numInvIfgram.h5          (dataset: mask)
     downstream of correct_topography:
-        timeseries_demErr.h5     (dataset: timeseries)
-        demErr.h5                (dataset: demErr)
+        timeseries*demErr.h5     (dataset: timeseries, glob — actual
+                                  filename depends on the template's
+                                  tropo/deramp suffix accumulation,
+                                  e.g. timeseries_ERA5_ramp_demErr.h5
+                                  on Fernandina vs timeseries_demErr.h5
+                                  on Kuju where tropo/deramp are off)
+        demErr.h5                (dataset: dem)
     final pipeline products:
         velocity.h5              (dataset: velocity)
         geo_velocity.h5          (dataset: velocity, optional)
@@ -35,16 +40,18 @@ import h5py
 import numpy as np
 
 
-# (filename, dataset_key, required) — required=False means it is OK to
-# be missing in both workdirs (then this product is skipped silently).
-PRODUCTS: tuple[tuple[str, str, bool], ...] = (
-    ('timeseries.h5', 'timeseries', True),
-    ('temporalCoherence.h5', 'temporalCoherence', True),
-    ('numInvIfgram.h5', 'numInvIfgram', True),
-    ('timeseries_demErr.h5', 'timeseries', True),
-    ('demErr.h5', 'demErr', True),
-    ('velocity.h5', 'velocity', True),
-    ('geo_velocity.h5', 'velocity', False),
+# (subdir, pattern, dataset_key, required) — pattern may be a literal
+# filename or a glob; for globs the *longest* match wins (so the most
+# suffix-accumulated product is picked under MintPy's processing-
+# chain naming convention).
+PRODUCTS: tuple[tuple[str, str, str, bool], ...] = (
+    ('.', 'timeseries.h5', 'timeseries', True),
+    ('.', 'temporalCoherence.h5', 'temporalCoherence', True),
+    ('.', 'numInvIfgram.h5', 'mask', True),
+    ('.', 'timeseries*demErr.h5', 'timeseries', True),
+    ('.', 'demErr.h5', 'dem', True),
+    ('.', 'velocity.h5', 'velocity', True),
+    ('geo', 'geo_velocity.h5', 'velocity', False),
 )
 
 # Gate per Issue #21 acceptance criteria: rms/scale < 1e-5 (float32
@@ -100,36 +107,64 @@ def _diff_metrics(cpu: np.ndarray, gpu: np.ndarray) -> dict:
     }
 
 
+def _resolve(workdir: Path, subdir: str, pattern: str) -> Path | None:
+    """Resolve a (subdir, pattern) spec to a file path in workdir.
+
+    Literal patterns return workdir/subdir/pattern if it exists. Glob
+    patterns return the *longest* match by filename — under MintPy's
+    suffix-accumulation convention this is the most-processed product
+    (e.g. timeseries_ERA5_ramp_demErr.h5 wins over timeseries_demErr.h5
+    when both exist).
+    """
+    base = workdir / subdir if subdir != '.' else workdir
+    if '*' in pattern or '?' in pattern:
+        matches = sorted(base.glob(pattern), key=lambda p: len(p.name),
+                         reverse=True)
+        return matches[0] if matches else None
+    p = base / pattern
+    return p if p.is_file() else None
+
+
 def _compare_one(cpu_wd: Path, gpu_wd: Path,
-                 fname: str, key: str, required: bool) -> dict:
-    """Diff one product file across the two workdirs."""
-    # MintPy writes most products under the workdir root; some live
-    # under geo/ (e.g. geo_velocity.h5 after geocoding).
-    candidates = [Path(fname), Path('geo') / fname]
-    cpu_h5: Path | None = None
-    gpu_h5: Path | None = None
-    for rel in candidates:
-        if (cpu_wd / rel).is_file():
-            cpu_h5 = cpu_wd / rel
-        if (gpu_wd / rel).is_file():
-            gpu_h5 = gpu_wd / rel
+                 subdir: str, pattern: str,
+                 key: str, required: bool) -> dict:
+    """Diff one product across the two workdirs."""
+    cpu_h5 = _resolve(cpu_wd, subdir, pattern)
+    gpu_h5 = _resolve(gpu_wd, subdir, pattern)
+    spec = f'{subdir}/{pattern}' if subdir != '.' else pattern
 
     if cpu_h5 is None and gpu_h5 is None:
-        return {'file': fname, 'status': 'absent_in_both',
+        return {'file': spec, 'status': 'absent_in_both',
                 'required': required}
     if cpu_h5 is None or gpu_h5 is None:
-        return {'file': fname, 'status': 'absent_in_one',
+        return {'file': spec, 'status': 'absent_in_one',
                 'cpu_path': str(cpu_h5) if cpu_h5 else None,
                 'gpu_path': str(gpu_h5) if gpu_h5 else None,
                 'required': required}
 
-    cpu = _read_dataset(cpu_h5, key)
-    gpu = _read_dataset(gpu_h5, key)
+    # For globs, cpu and gpu should resolve to the same filename;
+    # if not, flag it as a structural mismatch (different processing
+    # chains produced different product names).
+    if cpu_h5.name != gpu_h5.name:
+        return {'file': spec, 'status': 'filename_mismatch',
+                'cpu_path': str(cpu_h5),
+                'gpu_path': str(gpu_h5),
+                'required': required}
+
+    try:
+        cpu = _read_dataset(cpu_h5, key)
+        gpu = _read_dataset(gpu_h5, key)
+    except KeyError as e:
+        return {'file': spec, 'status': 'dataset_key_error',
+                'error': str(e),
+                'required': required}
+
     metrics = _diff_metrics(cpu, gpu)
     rms_rel = metrics['rms_over_scale']
     gate_pass = (np.isfinite(rms_rel) and rms_rel < GATE_RMS_OVER_SCALE)
     return {
-        'file': fname,
+        'file': spec,
+        'resolved_filename': cpu_h5.name,
         'status': 'compared',
         'cpu_path': str(cpu_h5),
         'gpu_path': str(gpu_h5),
@@ -155,17 +190,20 @@ def main() -> int:
     gpu_wd = Path(args.gpu_workdir).resolve()
 
     results = []
-    for fname, key, required in PRODUCTS:
-        results.append(_compare_one(cpu_wd, gpu_wd, fname, key, required))
+    for subdir, pattern, key, required in PRODUCTS:
+        results.append(_compare_one(cpu_wd, gpu_wd, subdir, pattern,
+                                    key, required))
 
     # Summary roll-up.
     compared = [r for r in results if r['status'] == 'compared']
     n_compared = len(compared)
     n_pass = sum(1 for r in compared if r['gate_pass'])
     n_fail = n_compared - n_pass
+    bad_status = ('absent_in_one', 'absent_in_both', 'filename_mismatch',
+                  'dataset_key_error')
     n_missing_required = sum(
         1 for r in results
-        if r['status'] in ('absent_in_one', 'absent_in_both') and r.get('required')
+        if r['status'] in bad_status and r.get('required')
     )
 
     report = {
