@@ -1,10 +1,17 @@
-# GPU benchmark template for GalapagosSenDT128 — copy of the dataset's
-# embedded inputs/GalapagosSenDT128.template (Zenodo record 4743058) with
-# the two opt-in GPU solver flags added at the end so both the
-# invert_network and correct_topography steps use the GPU-batched
-# solvers. The cpu baseline run uses the embedded template directly
-# (no solver lines, defaults to cpu). Used by the Issue #21 end-to-end
-# bench harness.
+# CPU baseline fixture for GalapagosSenDT128 — derived from the
+# dataset's embedded mintpy/inputs/GalapagosSenDT128.template (Zenodo
+# record 4743058). Differs from fixtures/GalapagosSenDT128_torch.txt
+# only by the trailing `mintpy.*.solver = torch` lines, which are
+# omitted so MintPy uses the default cpu solver for both invert_network
+# and correct_topography. Used by the Issue #21 end-to-end bench
+# harness paired with the torch fixture.
+#
+# Raw ISCE inputs referenced under $GALAPAGOS_DIR/... no longer exist
+# on disk (the Issue #6 large-scene bench cleaned them up after load).
+# The harness pre-seeds ifgramStack.h5 + geometryRadar.h5 symlinks
+# into the workdir's inputs/ from the original mintpy/inputs/ so
+# smallbaselineApp skips load_data via update-mode; the $GALAPAGOS_DIR
+# variable just needs to resolve to a valid path string for parsing.
 # vim: set filetype=cfg:
 ##----------------------------- SentinelStack/ISCE ---------------------##
 cleanopt                        = 1    # [ 0 / 1 / 2 / 3 4]   0: no cleaning, 1: largest files, 2: merged/etc, PROCESS dirs, 3: SLC,RAW, 4: everything
@@ -47,7 +54,3 @@ mintpy.network.endDate                   = 20180626
 mintpy.unwrapError.method                = bridging+phase_closure   #[bridging / phase_closure / no], auto for no
 mintpy.topographicResidual.stepFuncDate  = 20150524,20150616,20170321,20170910,20180613  #Wolf,Wolf,CerroAzul,Fernandina,Fernandina
 mintpy.deramp                            = linear
-
-##---------GPU acceleration (fork-only, opt-in):
-mintpy.networkInversion.solver           = torch
-mintpy.topographicResidual.solver        = torch

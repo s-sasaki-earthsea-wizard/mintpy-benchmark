@@ -1,8 +1,8 @@
 # GPU benchmark template — copy of docs/templates/SanFranSenDT42.txt
-# with mintpy.networkInversion.solver = torch added at the end so the
-# invert_network step uses the GPU-batched solver. Used by Issue #19
-# Tier 1 bench survey (extends Fernandina + Galapagos with an ARIA
-# ingest path).
+# with the two opt-in GPU solver flags added at the end so both the
+# invert_network and correct_topography steps use the GPU-batched
+# solvers. Used by Issue #19 Tier 1 bench survey (ARIA ingest path)
+# and the Issue #21 end-to-end bench harness.
 # vim: set filetype=cfg:
 mintpy.load.processor       = aria  #[isce, aria, snap, gamma, roipac], auto for isce
 ##---------interferogram datasets:
@@ -21,7 +21,12 @@ mintpy.deramp               = no
 
 ## options to speedup the processing (fast but not the best)
 mintpy.networkInversion.weightFunc              = no
-mintpy.topographicResidual.pixelwiseGeometry    = no
+# `mintpy.topographicResidual.pixelwiseGeometry = no` was set in the
+# Issue #19 Tier 1 direct-call fixture to skip the pixelwise path
+# entirely. For the Issue #21 end-to-end bench we let it default to
+# `yes` so the GPU correct_topography solver is actually exercised
+# (the `= no` mean-geometry path bypasses mintpy.gpu.dem_error).
 
-##---------GPU acceleration of invert_network (fork-only, opt-in):
+##---------GPU acceleration (fork-only, opt-in):
 mintpy.networkInversion.solver                  = torch
+mintpy.topographicResidual.solver               = torch

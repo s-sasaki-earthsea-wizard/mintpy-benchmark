@@ -1,0 +1,25 @@
+# CPU baseline fixture for SanFranSenDT42 — derived from
+# docs/templates/SanFranSenDT42.txt with the `weightFunc = no`
+# inversion speed-up retained to match
+# fixtures/SanFranSenDT42_torch.txt. Differs from the torch fixture
+# only by the trailing `mintpy.*.solver = torch` lines so the wall
+# comparison is fair. Tropo defaults to pyaps (ERA5) on both sides
+# matching the upstream docs template.
+# vim: set filetype=cfg:
+mintpy.load.processor       = aria  #[isce, aria, snap, gamma, roipac], auto for isce
+##---------interferogram datasets:
+mintpy.load.unwFile         = ../stack/unwrapStack.vrt
+mintpy.load.corFile         = ../stack/cohStack.vrt
+mintpy.load.connCompFile    = ../stack/connCompStack.vrt
+##---------geometry datasets:
+mintpy.load.demFile         = ../DEM/*.dem
+mintpy.load.incAngleFile    = ../incidenceAngle/*.vrt
+mintpy.load.azAngleFile     = ../azimuthAngle/*.vrt
+mintpy.load.waterMaskFile   = ../mask/watermask.msk
+
+mintpy.reference.lalo       = 37.69, -122.07
+mintpy.unwrapError.method   = bridging
+mintpy.deramp               = no
+
+## options to speedup the processing (fast but not the best)
+mintpy.networkInversion.weightFunc              = no

@@ -15,8 +15,8 @@ LOG_DIR="${1:-${REPO_ROOT}/benchmark/logs_baseline}"
 # Resolve LOG_DIR to an absolute path so log writes still work after we cd
 # into WORK_DIR below. -m allows the path not to exist yet.
 LOG_DIR="$(realpath -m -- "${LOG_DIR}")"
-PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
-SBA_BIN="${REPO_ROOT}/.venv/bin/smallbaselineApp.py"
+PYTHON_BIN="${PYTHON_BIN:-${REPO_ROOT}/.venv/bin/python}"
+SBA_BIN="${SBA_BIN:-${REPO_ROOT}/.venv/bin/smallbaselineApp.py}"
 
 mkdir -p "${LOG_DIR}"
 SUMMARY="${LOG_DIR}/summary.tsv"

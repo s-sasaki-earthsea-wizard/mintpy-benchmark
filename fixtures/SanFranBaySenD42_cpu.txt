@@ -1,8 +1,9 @@
-# GPU benchmark template — copy of docs/templates/SanFranBaySenD42.txt
-# with the two opt-in GPU solver flags added at the end so both the
-# invert_network and correct_topography steps use the GPU-batched
-# solvers. Used by Issue #19 Tier 1 bench survey (GMTSAR ingest path
-# + D = 333) and the Issue #21 end-to-end bench harness.
+# CPU baseline fixture for SanFranBaySenD42 — derived from
+# docs/templates/SanFranBaySenD42.txt with the Issue #19 bench
+# `troposphericDelay.method = no` override applied to match
+# fixtures/SanFranBaySenD42_torch.txt (skip ERA5 download for GMTSAR
+# bench). Differs from the torch fixture only by the trailing
+# `mintpy.*.solver = torch` lines so the wall comparison is fair.
 # vim: set filetype=cfg:
 ## manually add the following metadata
 HEADING = -168
@@ -31,7 +32,3 @@ mintpy.reference.lalo           = 37.69, -122.07
 mintpy.troposphericDelay.method = no
 mintpy.deramp                   = no
 mintpy.topographicResidual      = yes
-
-##---------GPU acceleration (fork-only, opt-in):
-mintpy.networkInversion.solver  = torch
-mintpy.topographicResidual.solver = torch

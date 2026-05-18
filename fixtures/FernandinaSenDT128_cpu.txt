@@ -1,7 +1,10 @@
-# GPU benchmark template — copy of docs/templates/FernandinaSenDT128.txt
-# with the two opt-in GPU solver flags added at the end so both the
-# invert_network and correct_topography steps use the GPU-batched
-# solvers. Used by the Issue #21 end-to-end bench harness.
+# CPU baseline fixture for FernandinaSenDT128 — byte-for-byte identical
+# to fixtures/FernandinaSenDT128_torch.txt except for the trailing
+# `mintpy.*.solver = torch` lines, which are omitted so MintPy uses the
+# default cpu solver for both invert_network and correct_topography.
+# Used by the Issue #21 end-to-end bench harness paired with the torch
+# fixture; the harness asserts that the cpu and torch fixtures differ
+# only in the 2 solver lines so the wall comparison is fair.
 # vim: set filetype=cfg:
 ##------------------------------- ISCE/topsStack ----------------------##
 #ssaraopt = --platform=SENTINEL-1A,SENTINEL-1B -r 128 -f 589,590,591,592,593  -e 2017-07-01
@@ -39,7 +42,3 @@ mintpy.load.waterMaskFile    = None
 mintpy.reference.lalo               = -0.30,-91.43
 mintpy.topographicResidual.stepDate = 20170910,20180613  #eruption dates
 mintpy.deramp                       = linear
-
-##---------GPU acceleration (fork-only, opt-in):
-mintpy.networkInversion.solver      = torch
-mintpy.topographicResidual.solver   = torch

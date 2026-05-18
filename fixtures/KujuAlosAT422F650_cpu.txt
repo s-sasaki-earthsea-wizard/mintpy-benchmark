@@ -1,14 +1,10 @@
-# GPU benchmark template — copy of docs/templates/KujuAlosAT422F650.txt
-# with the two opt-in GPU solver flags added at the end so both the
-# invert_network and correct_topography steps use the GPU-batched
-# solvers. Used by Issue #19 Tier 1 bench survey (ALOS L-band /
-# ROI_PAC ingest path) and the Issue #21 end-to-end bench harness.
-#
-# Differences from docs/templates beyond the solver line:
-#   - mintpy.troposphericDelay.method = no       (skip ERA5 download;
-#                                                 bench runs on raw
-#                                                 timeseries.h5)
-#   - mintpy.save.hdfEos5            = no        (skip HE5 packaging)
+# CPU baseline fixture for KujuAlosAT422F650 — derived from
+# docs/templates/KujuAlosAT422F650.txt with the same Issue #19 bench
+# overrides as fixtures/KujuAlosAT422F650_torch.txt
+# (`troposphericDelay.method = no` to skip ERA5 download for ALOS-1
+# L-band 2007-2011 data, `save.hdfEos5 = no` to skip HE5 packaging).
+# Differs from the torch fixture only by the trailing
+# `mintpy.*.solver = torch` lines so the wall comparison is fair.
 # vim: set filetype=cfg:
 ########## 1. Load Data (--load to exit after this step)
 ## auto - automatic path pattern for Univ of Miami file structure
@@ -33,7 +29,3 @@ mintpy.reference.lalo               = 33.0655, 131.2076
 mintpy.troposphericDelay.method     = no   # bench: run on raw timeseries.h5
 mintpy.deramp                       = no
 mintpy.save.hdfEos5                 = no   # bench: skip HE5 packaging
-
-##---------GPU acceleration (fork-only, opt-in):
-mintpy.networkInversion.solver      = torch
-mintpy.topographicResidual.solver   = torch
